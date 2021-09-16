@@ -1,11 +1,13 @@
 import type {
     FungibleTokenDetailed,
+    ERC721ContractDetailed,
     GasNow,
     NetworkType,
     ProviderType,
     TransactionState,
     Wallet,
 } from '@masknet/web3-shared'
+import type { TransactionReceipt } from 'web3-core'
 import { createPluginMessage, PluginMessageEmitter } from '@masknet/plugin-infra'
 import { PLUGIN_IDENTIFIER } from './constants'
 
@@ -77,6 +79,16 @@ export type WalletRenameDialogEvent = {
     wallet: Wallet | null
 }
 
+export type WalletRiskWarningDialogEvent =
+    | {
+          open: true
+          wallet?: Wallet
+      }
+    | {
+          open: false
+          type: 'cancel' | 'confirm'
+      }
+
 export type WalletConnectQRCodeDialogEvent =
     | {
           open: true
@@ -109,6 +121,16 @@ export type SelectTokenDialogEvent =
            */
           token?: FungibleTokenDetailed
       }
+
+export type SelectNftContractDialogEvent = {
+    open: boolean
+    uuid: string
+
+    /**
+     * The selected detailed nft contract.
+     */
+    contract?: ERC721ContractDetailed
+}
 
 export interface WalletMessage {
     /**
@@ -167,15 +189,31 @@ export interface WalletMessage {
     selectTokenDialogUpdated: SelectTokenDialogEvent
 
     /**
+     * Select nft contract dialog
+     */
+    selectNftContractDialogUpdated: SelectNftContractDialogEvent
+
+    /**
      * WalletConnect QR Code dialog
      */
     walletConnectQRCodeDialogUpdated: WalletConnectQRCodeDialogEvent
 
+    /**
+     * Wallet Risk Warning dialog
+     */
+    walletRiskWarningDialogUpdated: WalletRiskWarningDialogEvent
+
     walletsUpdated: void
     phrasesUpdated: void
+    addressBookUpdated: void
+    recentTransactionsUpdated: void
+    receiptUpdated: TransactionReceipt
+    requestsUpdated: void
     erc20TokensUpdated: void
     erc721TokensUpdated: void
     erc1155TokensUpdated: void
+    /** true: Now locked; false: Now unlocked */
+    walletLockStatusUpdated: boolean
     rpc: unknown
 }
 

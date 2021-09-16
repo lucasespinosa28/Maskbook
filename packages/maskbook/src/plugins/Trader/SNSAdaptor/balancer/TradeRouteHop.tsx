@@ -1,10 +1,12 @@
-import { Box, makeStyles, AvatarGroup, Link } from '@material-ui/core'
+import { Box, AvatarGroup, Link } from '@material-ui/core'
+import { makeStyles } from '@masknet/theme'
 import { TokenIcon } from '@masknet/shared'
-import { Hop, TradeProvider } from '../../types'
-import { resolveTradePairLink } from '../../pipes'
 import { useNetworkType } from '@masknet/web3-shared'
+import { TradeProvider } from '@masknet/public-api'
+import type { Hop } from '../../types'
+import { resolveTradePairLink } from '../../pipes'
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles()((theme) => ({
     root: {
         display: 'flex',
         borderRadius: 500,
@@ -25,7 +27,7 @@ export interface TradeRouteHopProps {
 
 export function TradeRouteHop(props: TradeRouteHopProps) {
     const { hop } = props
-    const classes = useStyles()
+    const { classes } = useStyles()
     const networkType = useNetworkType()
 
     return (

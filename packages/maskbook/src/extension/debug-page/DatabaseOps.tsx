@@ -37,7 +37,6 @@ export const DatabaseOps: React.FC = () => {
         await Promise.all(
             databases.map(async ({ name }) => {
                 await timeout(wrap(indexedDB.deleteDatabase(name)), 500)
-                console.log(`clear ${name}`)
             }),
         )
     }
@@ -79,7 +78,6 @@ function timeout<T>(promise: PromiseLike<T>, time: number): Promise<T | undefine
 }
 
 async function restoreAll(parsed: BackupFormat) {
-    console.log('restoring with', parsed)
     for (const { name, version, stores } of parsed.instances) {
         const db = await openDB(name, version, {
             upgrade(db) {
@@ -103,10 +101,10 @@ async function restoreAll(parsed: BackupFormat) {
                     } else {
                         await db.add(storeName, value, key)
                     }
-                } catch (e) {
+                } catch (error) {
                     console.error('Recover error when ', key, value, parsed)
                     // Error from IndexedDB transaction is not recoverable
-                    throw e
+                    throw error
                 }
             }
         }

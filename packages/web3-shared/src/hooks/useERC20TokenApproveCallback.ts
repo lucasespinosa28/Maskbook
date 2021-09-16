@@ -4,9 +4,7 @@ import { once } from 'lodash-es'
 import type { NonPayableTx } from '@masknet/web3-contracts/types/types'
 import { TransactionEventType } from '../types'
 import { useERC20TokenContract } from '../contracts/useERC20TokenContract'
-import { useNonce } from './useNonce'
 import { useAccount } from './useAccount'
-import { useGasPrice } from './useGasPrice'
 import { useERC20TokenAllowance } from './useERC20TokenAllowance'
 import { useERC20TokenBalance } from './useERC20TokenBalance'
 import { TransactionStateType, useTransactionState } from './useTransactionState'
@@ -15,18 +13,16 @@ import { isLessThan } from '../utils'
 const MaxUint256 = new BigNumber('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff').toFixed()
 
 export enum ApproveStateType {
-    UNKNOWN,
-    NOT_APPROVED,
-    UPDATING,
-    PENDING,
-    APPROVED,
-    FAILED,
+    UNKNOWN = 0,
+    NOT_APPROVED = 1,
+    UPDATING = 2,
+    PENDING = 3,
+    APPROVED = 4,
+    FAILED = 5,
 }
 
 export function useERC20TokenApproveCallback(address?: string, amount?: string, spender?: string) {
     const account = useAccount()
-    const nonce = useNonce()
-    const gasPrice = useGasPrice()
     const erc20Contract = useERC20TokenContract(address)
     const [transactionState, setTransactionState] = useTransactionState()
 
@@ -107,8 +103,6 @@ export function useERC20TokenApproveCallback(address?: string, amount?: string, 
                         })
                         throw error
                     }),
-                gasPrice,
-                nonce,
             }
 
             // send transaction and wait for hash
@@ -148,18 +142,7 @@ export function useERC20TokenApproveCallback(address?: string, amount?: string, 
                     })
             })
         },
-        [
-            nonce,
-            gasPrice,
-            account,
-            amount,
-            balance,
-            spender,
-            loadingAllowance,
-            loadingBalance,
-            erc20Contract,
-            approveStateType,
-        ],
+        [account, amount, balance, spender, loadingAllowance, loadingBalance, erc20Contract, approveStateType],
     )
 
     const resetCallback = useCallback(() => {

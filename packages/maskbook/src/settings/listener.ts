@@ -16,8 +16,17 @@ import {
     currentNetworkSettings,
     currentPortfolioDataProviderSettings,
     currentProviderSettings,
+    currentIsMaskWalletLockedSettings,
+    currentTokenPricesSettings,
 } from '../plugins/Wallet/settings'
-import { currentDataProviderSettings } from '../plugins/Trader/settings'
+import {
+    currentDataProviderSettings,
+    ethereumNetworkTradeProviderSettings,
+    polygonNetworkTradeProviderSettings,
+    binanceNetworkTradeProviderSettings,
+    arbitrumNetworkTradeProviderSettings,
+    xdaiNetworkTradeProviderSettings,
+} from '../plugins/Trader/settings'
 
 export function ToBeListened() {
     return {
@@ -29,6 +38,7 @@ export function ToBeListened() {
         currentBalanceSettings,
         currentBlockNumberSettings,
         currentEtherPriceSettings,
+        currentTokenPricesSettings,
         currentTrendingDataProviderSettings: currentDataProviderSettings,
         currentProviderSettings,
         currentNetworkSettings,
@@ -36,6 +46,12 @@ export function ToBeListened() {
         currentPortfolioDataProviderSettings,
         currentCollectibleDataProviderSettings,
         currentPersonaIdentifier,
+        ethereumNetworkTradeProviderSettings,
+        polygonNetworkTradeProviderSettings,
+        binanceNetworkTradeProviderSettings,
+        arbitrumNetworkTradeProviderSettings,
+        xdaiNetworkTradeProviderSettings,
+        currentIsMaskWalletLockedSettings,
     }
 }
 export type SettingsEventName = ReturnType<typeof ToBeListened>

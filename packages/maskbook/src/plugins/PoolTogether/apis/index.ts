@@ -3,7 +3,7 @@ import { API_URL } from '../constants'
 import type { Pool, TokenFaucet } from '../types'
 
 export async function fetchPools(chainId: ChainId) {
-    // See https://github.com/pooltogether/pooltogether-api-monorepo for API documention
+    // See https://github.com/pooltogether/pooltogether-api-monorepo for API documentation
     const url = new URL(`/pools/${chainId}.json`, API_URL)
     const response = await fetch(url.toString(), {})
     const data = (await response.json()) as Pool[] | null
@@ -23,7 +23,6 @@ export async function fetchPool(address?: string, subgraphUrl?: string) {
                 prizeStrategy{
                     singleRandomWinner{
                         prizePeriodSeconds,
-                        prizePeriodStartedAt
                         ticket{
                             id
                             decimals
@@ -33,7 +32,6 @@ export async function fetchPool(address?: string, subgraphUrl?: string) {
                     }
                     multipleWinners{
                         prizePeriodSeconds,
-                        prizePeriodStartedAt
                         numberOfWinners
                         ticket{
                             id
@@ -56,8 +54,8 @@ export async function fetchPool(address?: string, subgraphUrl?: string) {
     const result = (await response.json())?.data
     const prizePool = result.prizePool
 
-    const prizeStrategy = prizePool.prizeStrategy.singleRandomWinne
-        ? prizePool.prizeStrategy.singleRandomWinne
+    const prizeStrategy = prizePool.prizeStrategy.singleRandomWinner
+        ? prizePool.prizeStrategy.singleRandomWinner
         : prizePool.prizeStrategy.multipleWinners
 
     return {
@@ -66,14 +64,7 @@ export async function fetchPool(address?: string, subgraphUrl?: string) {
             numberOfWinners: prizeStrategy.numberOfWinners ?? '1',
             prizePeriodSeconds: prizeStrategy.prizePeriodSeconds,
         },
-        prize: {
-            prizePeriodStartedAt: {
-                hex: Number.parseInt(prizeStrategy.prizePeriodStartedAt, 10).toString(16),
-            },
-            prizePeriodSeconds: {
-                hex: Number.parseInt(prizeStrategy.prizePeriodSeconds, 10).toString(16),
-            },
-        },
+        prize: {},
         prizePool: {
             address: address,
         },
@@ -92,5 +83,5 @@ export async function fetchPool(address?: string, subgraphUrl?: string) {
             },
         },
         tokenFaucets: [] as TokenFaucet[],
-    } as Pool
+    } as unknown as Pool
 }

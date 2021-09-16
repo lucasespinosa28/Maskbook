@@ -30,7 +30,7 @@ function useCollectibleState(token?: CollectibleToken) {
     )
     //#endregion
 
-    //#reguin events
+    //#region events
     const [eventPage, setEventPage] = useState(0)
     const cursors = useRef<string[]>([])
     const events = useEvents(
@@ -41,8 +41,7 @@ function useCollectibleState(token?: CollectibleToken) {
 
     useUpdateEffect(() => {
         if (
-            events.value &&
-            events.value.pageInfo.endCursor &&
+            events.value?.pageInfo.endCursor &&
             !cursors.current.some((item) => events.value && item === events.value.pageInfo.endCursor)
         ) {
             cursors.current.push(events.value.pageInfo.endCursor)

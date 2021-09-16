@@ -220,7 +220,7 @@ export async function getCoinInfo(id: string) {
         fetchTokenData(id, oneMonthBlock),
         fetchTokenData(id, oneYearBlock),
     ])
-    //#engregion
+    //#endregion
 
     //#region calculate the trade volume and the untracked volume before day ago
     const oneDayVolumeUSD = new BigNumber(token?.tradeVolumeUSD ?? 0).minus(oneDayToken?.tradeVolumeUSD ?? 0).toNumber()
@@ -316,32 +316,31 @@ export async function getBulkPairData(pairList: string[]) {
     const oneDayData = oneDayResult.reduce<Record<string, Data>>((obj, cur) => ({ ...obj, [cur.id]: cur }), {})
 
     const pairsData = await Promise.all(
-        current &&
-            current.map(async (pair) => {
-                let oneDayHistory = oneDayData[pair.id]
-                if (!oneDayHistory) {
-                    oneDayHistory = await fetchPairData(pair.id, oneDayBlock)
-                }
+        current?.map(async (pair) => {
+            let oneDayHistory = oneDayData[pair.id]
+            if (!oneDayHistory) {
+                oneDayHistory = await fetchPairData(pair.id, oneDayBlock)
+            }
 
-                const oneDayVolumeUSD = new BigNumber(pair.volumeUSD).minus(oneDayHistory?.volumeUSD ?? 0).toNumber()
-                const oneDayVolumeUntracked = new BigNumber(pair.untrackedVolumeUSD)
-                    .minus(oneDayHistory?.untrackedVolumeUSD ?? 0)
-                    .toNumber()
+            const oneDayVolumeUSD = new BigNumber(pair.volumeUSD).minus(oneDayHistory?.volumeUSD ?? 0).toNumber()
+            const oneDayVolumeUntracked = new BigNumber(pair.untrackedVolumeUSD)
+                .minus(oneDayHistory?.untrackedVolumeUSD ?? 0)
+                .toNumber()
 
-                const result = {
-                    ...pair,
-                    oneDayVolumeUSD,
-                    oneDayVolumeUntracked,
-                }
+            const result = {
+                ...pair,
+                oneDayVolumeUSD,
+                oneDayVolumeUntracked,
+            }
 
-                if (!oneDayHistory && pair && isGreaterThan(pair.createdAtBlockNumber, oneDayBlock ?? 0)) {
-                    result.oneDayVolumeUSD = new BigNumber(pair.volumeUSD).toNumber()
-                }
-                if (!oneDayHistory && pair) {
-                    result.oneDayVolumeUSD = new BigNumber(pair.volumeUSD).toNumber()
-                }
-                return result
-            }),
+            if (!oneDayHistory && pair && isGreaterThan(pair.createdAtBlockNumber, oneDayBlock ?? 0)) {
+                result.oneDayVolumeUSD = new BigNumber(pair.volumeUSD).toNumber()
+            }
+            if (!oneDayHistory && pair) {
+                result.oneDayVolumeUSD = new BigNumber(pair.volumeUSD).toNumber()
+            }
+            return result
+        }),
     )
 
     return pairsData.reduce<Record<string, Data & { oneDayVolumeUSD: number; oneDayVolumeUntracked: number }>>(

@@ -1,7 +1,8 @@
 import type { SocialNetworkUI } from '../../../social-network'
 import { untilElementAvailable } from '../../../utils/dom'
 import { MaskMessage } from '../../../utils/messages'
-import { delay, dispatchCustomEvents, selectElementContents } from '../../../utils/utils'
+import { delay, selectElementContents } from '../../../utils/utils'
+import { inputText } from '@masknet/injected-script'
 import { getEditorContent, hasEditor, hasFocus, isCompose } from '../utils/postBox'
 import { composeButtonSelector, postEditorDraftContentSelector } from '../utils/selector'
 
@@ -39,7 +40,7 @@ export const pasteTextToCompositionMinds: SocialNetworkUI.AutomationCapabilities
             selectElementContents(textarea)
 
             // paste
-            dispatchCustomEvents(textarea, 'input', text)
+            inputText(text)
 
             await delay(interval)
             if (!getEditorContent().replace(/\n/g, '').includes(text.replace(/\n/g, ''))) {
@@ -56,5 +57,5 @@ export const pasteTextToCompositionMinds: SocialNetworkUI.AutomationCapabilities
         setTimeout(() => {
             abortCtr.abort()
         }, timeout)
-        worker(abortCtr).then(undefined, (e) => fail(e))
+        worker(abortCtr).then(undefined, (error) => fail(error))
     }

@@ -1,15 +1,18 @@
 import type BigNumber from 'bignumber.js'
-import { Currency, DataProvider, TradeProvider, WarningLevel, ZrxTradePool } from './types'
+import { Currency, WarningLevel, ZrxTradePool } from './types'
+import { DataProvider, TradeProvider } from '@masknet/public-api'
 import { safeUnreachable, unreachable } from '@dimensiondev/kit'
 import {
     BIPS_BASE,
+    networkNames,
     PRICE_IMPACT_HIGH,
     PRICE_IMPACT_LOW,
     PRICE_IMPACT_MEDIUM,
     PRICE_IMPACT_NON_EXPERT_BLOCKED,
     PRICE_IMPACT_WITHOUT_FEE_CONFIRM_MIN,
 } from './constants'
-import { NetworkType } from '@masknet/web3-shared'
+import { createLookupTableResolver, NetworkType } from '@masknet/web3-shared'
+import urlcat from 'urlcat'
 
 export function resolveCurrencyName(currency: Currency) {
     return [
@@ -19,59 +22,67 @@ export function resolveCurrencyName(currency: Currency) {
     ].join(' ')
 }
 
-export function resolveDataProviderName(dataProvider: DataProvider) {
-    switch (dataProvider) {
-        case DataProvider.COIN_GECKO:
-            return 'CoinGecko'
-        case DataProvider.COIN_MARKET_CAP:
-            return 'CoinMarketCap'
-        case DataProvider.UNISWAP_INFO:
-            return 'Uniswap Info'
-        default:
-            unreachable(dataProvider)
-    }
-}
+export const resolveDataProviderName = createLookupTableResolver<DataProvider, string>(
+    {
+        [DataProvider.COIN_GECKO]: 'CoinGecko',
+        [DataProvider.COIN_MARKET_CAP]: 'CoinMarketCap',
+        [DataProvider.UNISWAP_INFO]: 'Uniswap Info',
+    },
+    (dataProvider) => {
+        throw new Error(`Unknown data provider: ${dataProvider}`)
+    },
+)
 
-export function resolveDataProviderLink(dataProvider: DataProvider) {
-    switch (dataProvider) {
-        case DataProvider.COIN_GECKO:
-            return 'https://www.coingecko.com/'
-        case DataProvider.COIN_MARKET_CAP:
-            return 'https://coinmarketcap.com/'
-        case DataProvider.UNISWAP_INFO:
-            return 'https://info.uniswap.org/'
-        default:
-            unreachable(dataProvider)
-    }
-}
+export const resolveDataProviderLink = createLookupTableResolver<DataProvider, string>(
+    {
+        [DataProvider.COIN_GECKO]: 'https://www.coingecko.com/',
+        [DataProvider.COIN_MARKET_CAP]: 'https://coinmarketcap.com/',
+        [DataProvider.UNISWAP_INFO]: 'https://info.uniswap.org/',
+    },
+    (dataProvider) => {
+        throw new Error(`Unknown data provider: ${dataProvider}`)
+    },
+)
 
-export function resolveTradeProviderName(tradeProvider: TradeProvider) {
+export const resolveTradeProviderName = createLookupTableResolver<TradeProvider, string>(
+    {
+        [TradeProvider.UNISWAP_V2]: 'Uniswap V2',
+        [TradeProvider.UNISWAP_V3]: 'Uniswap V3',
+        [TradeProvider.ZRX]: '0x',
+        [TradeProvider.SUSHISWAP]: 'SushiSwap',
+        [TradeProvider.SASHIMISWAP]: 'SashimiSwap',
+        [TradeProvider.BALANCER]: 'Balancer',
+        [TradeProvider.QUICKSWAP]: 'QuickSwap',
+        [TradeProvider.PANCAKESWAP]: 'PancakeSwap',
+        [TradeProvider.DODO]: 'DODO',
+    },
+    (tradeProvider) => {
+        throw new Error(`Unknown provider type: ${tradeProvider}`)
+    },
+)
+
+export function resolveTradeProviderLink(tradeProvider: TradeProvider, networkType: NetworkType) {
     switch (tradeProvider) {
-        case TradeProvider.UNISWAP:
-            return 'Uniswap V2'
-        case TradeProvider.ZRX:
-            return '0x'
-        case TradeProvider.SUSHISWAP:
-            return 'SushiSwap'
-        case TradeProvider.SASHIMISWAP:
-            return 'SashimiSwap'
-        case TradeProvider.BALANCER:
-            return 'Balancer'
-        case TradeProvider.QUICKSWAP:
-            return 'QuickSwap'
-        case TradeProvider.PANCAKESWAP:
-            return 'PancakeSwap'
-        default:
-            unreachable(tradeProvider)
-    }
-}
-
-export function resolveTradeProviderLink(tradeProvider: TradeProvider) {
-    switch (tradeProvider) {
-        case TradeProvider.UNISWAP:
+        case TradeProvider.UNISWAP_V2:
+            return 'https://uniswap.org/'
+        case TradeProvider.UNISWAP_V3:
             return 'https://uniswap.org/'
         case TradeProvider.ZRX:
-            return 'https://0x.org/'
+            switch (networkType) {
+                case NetworkType.Ethereum:
+                    return 'https://api.0x.org/'
+                case NetworkType.Binance:
+                    return 'https://bsc.api.0x.org/'
+                case NetworkType.Polygon:
+                    return 'https://polygon.api.0x.org/'
+                case NetworkType.Arbitrum:
+                    return 'https://aribitrum.api.0x.org/'
+                case NetworkType.xDai:
+                    return 'https://xdai.api.0x.org/'
+                default:
+                    safeUnreachable(networkType)
+                    return ''
+            }
         case TradeProvider.SUSHISWAP:
             return 'https://sushiswapclassic.org/'
         case TradeProvider.SASHIMISWAP:
@@ -82,6 +93,8 @@ export function resolveTradeProviderLink(tradeProvider: TradeProvider) {
             return 'https://quickswap.exchange/'
         case TradeProvider.PANCAKESWAP:
             return 'https://exchange.pancakeswap.finance/#/swap'
+        case TradeProvider.DODO:
+            return 'https://app.dodoex.io'
         default:
             unreachable(tradeProvider)
     }
@@ -89,10 +102,23 @@ export function resolveTradeProviderLink(tradeProvider: TradeProvider) {
 
 export function resolveTradePairLink(tradeProvider: TradeProvider, address: string, networkType: NetworkType) {
     switch (tradeProvider) {
-        case TradeProvider.UNISWAP:
+        case TradeProvider.UNISWAP_V2:
             return `https://v2.info.uniswap.org/pair/${address}`
+        case TradeProvider.UNISWAP_V3:
+            return `https://info.uniswap.org/pair/${address}`
         case TradeProvider.ZRX:
             return ''
+        case TradeProvider.DODO: {
+            if (!networkNames[networkType]) {
+                console.error('Unsupported network: ', networkType)
+                return ''
+            }
+            return urlcat('https://app.dodoex.io/exchange/:address', {
+                address,
+                network: networkNames[networkType],
+                forced: true,
+            })
+        }
         case TradeProvider.SUSHISWAP:
             switch (networkType) {
                 case NetworkType.Ethereum:
@@ -101,6 +127,10 @@ export function resolveTradePairLink(tradeProvider: TradeProvider, address: stri
                     return `https://analytics-bsc.sushi.com/pairs/${address}`
                 case NetworkType.Polygon:
                     return `https://analytics-polygon.sushi.com/pairs/${address}`
+                case NetworkType.Arbitrum:
+                    return `https://analytics-aribtrum.sushi.com/pairs/${address}`
+                case NetworkType.xDai:
+                    return `https://analytics-xdai.sushi.com/pairs/${address}`
                 default:
                     safeUnreachable(networkType)
                     return ''
@@ -133,57 +163,75 @@ export function resolveUniswapWarningLevel(priceImpact: BigNumber) {
     if (priceImpact_.isGreaterThan(PRICE_IMPACT_HIGH)) return WarningLevel.HIGH
     if (priceImpact_.isGreaterThan(PRICE_IMPACT_MEDIUM)) return WarningLevel.MEDIUM
     if (priceImpact_.isGreaterThan(PRICE_IMPACT_LOW)) return WarningLevel.LOW
-    return
+    return WarningLevel.LOW
 }
 
-export function resolveUniswapWarningLevelColor(warningLevel?: WarningLevel) {
-    const COLOR_MAP: EnumRecord<WarningLevel, string> = {
+export const resolveUniswapWarningLevelColor = createLookupTableResolver<WarningLevel, string>(
+    {
         [WarningLevel.LOW]: 'inherit',
         [WarningLevel.MEDIUM]: '#f3841e',
         [WarningLevel.HIGH]: '#f3841e',
         [WarningLevel.CONFIRMATION_REQUIRED]: '#ff6871',
         [WarningLevel.BLOCKED]: '#ff6871',
-    }
-    return warningLevel ? COLOR_MAP[warningLevel] : '#27ae60'
-}
+    },
+    '#27ae60',
+)
 
-export function resolveZrxTradePoolName(swapSource: ZrxTradePool) {
-    const SWAP_SOURCE_NAME_MAP: EnumRecord<ZrxTradePool, string> = {
-        [ZrxTradePool.ZRX]: 'ZRX',
-        [ZrxTradePool.Uniswap]: 'Uniswap',
-        [ZrxTradePool.UniswapV2]: 'Uniswap V2',
-        [ZrxTradePool.Eth2Dai]: 'Eth2Dai',
-        [ZrxTradePool.Kyber]: 'Kyber',
-        [ZrxTradePool.Curve]: 'Curve',
+export const resolveZrxTradePoolName = createLookupTableResolver<ZrxTradePool, string>(
+    {
+        [ZrxTradePool.ZRX]: '0x',
+        [ZrxTradePool.ACryptoS]: 'ACryptoS',
+        [ZrxTradePool.ApeSwap]: 'ApeSwap',
+        [ZrxTradePool.BakerySwap]: 'BakerySwap',
         [ZrxTradePool.Balancer]: 'Balancer',
-        [ZrxTradePool.BalancerV2]: 'BalancerV2',
+        [ZrxTradePool.BalancerV2]: 'Balancer V2',
         [ZrxTradePool.Bancor]: 'Bancor',
-        [ZrxTradePool.MStable]: 'mStable',
-        [ZrxTradePool.Mooniswap]: 'Mooniswap',
-        [ZrxTradePool.Swerve]: 'Swerve',
-        [ZrxTradePool.SnowSwap]: 'SnowSwap',
-        [ZrxTradePool.SushiSwap]: 'SushiSwap',
-        [ZrxTradePool.Shell]: 'Shell',
-        [ZrxTradePool.MultiHop]: 'MultiHop',
+        [ZrxTradePool.Belt]: 'Belt',
+        [ZrxTradePool.CafeSwap]: 'CafeSwap',
+        [ZrxTradePool.CheeseSwap]: 'CheeseSwap',
+        [ZrxTradePool.ComethSwap]: 'ComethSwap',
+        [ZrxTradePool.Component]: 'Component',
+        [ZrxTradePool.Cream]: 'CREAM',
+        [ZrxTradePool.CryptoCom]: 'CryptoCom',
+        [ZrxTradePool.Curve]: 'Curve',
+        [ZrxTradePool.CurveV2]: 'Curve V2',
+        [ZrxTradePool.Dfyn]: 'Dfyn',
         [ZrxTradePool.Dodo]: 'DODO',
         [ZrxTradePool.DodoV2]: 'DODO V2',
-        [ZrxTradePool.Cream]: 'CREAM',
-        [ZrxTradePool.LiquidityProvider]: 'LiquidityProvider',
-        [ZrxTradePool.CryptoCom]: 'CryptoCom',
-        [ZrxTradePool.Linkswap]: 'Linkswap',
-        [ZrxTradePool.Lido]: 'Lido',
-        [ZrxTradePool.MakerPsm]: 'MakerPsm',
+        [ZrxTradePool.Ellipsis]: 'Ellipsis',
+        [ZrxTradePool.Eth2Dai]: 'Eth2Dai',
+        [ZrxTradePool.FirebirdOneSwap]: 'FirebirdOneSwap',
+        [ZrxTradePool.IronSwap]: 'IronSwap',
+        [ZrxTradePool.JetSwap]: 'JetSwap',
+        [ZrxTradePool.JulSwap]: 'JulSwap',
+        [ZrxTradePool.Kyber]: 'Kyber',
         [ZrxTradePool.KyberDMM]: 'KyberDMM',
-        [ZrxTradePool.Smoothy]: 'Smoothy',
-        [ZrxTradePool.Saddle]: 'Saddle',
-        [ZrxTradePool.xSigma]: 'xSigma',
-        [ZrxTradePool.UniswapV3]: 'Uniswap V3',
-        [ZrxTradePool.CurveV2]: 'Curve_V2',
-
-        // unseen in the response
-        [ZrxTradePool.Native]: 'Native',
+        [ZrxTradePool.Lido]: 'Lido',
+        [ZrxTradePool.Linkswap]: 'Linkswap',
+        [ZrxTradePool.LiquidityProvider]: 'LiquidityProvider',
+        [ZrxTradePool.MStable]: 'mStable',
+        [ZrxTradePool.MakerPsm]: 'MakerPsm',
         [ZrxTradePool.Mesh]: 'Mesh',
+        [ZrxTradePool.Mooniswap]: 'Mooniswap',
         [ZrxTradePool.MultiBridge]: 'MultiBridge',
-    }
-    return SWAP_SOURCE_NAME_MAP[swapSource] ?? 'Unknwn'
-}
+        [ZrxTradePool.MultiHop]: 'MultiHop',
+        [ZrxTradePool.Native]: 'Native',
+        [ZrxTradePool.Nerve]: 'Nerve',
+        [ZrxTradePool.Oasis]: 'Oasis',
+        [ZrxTradePool.PancakeSwap]: 'PancakeSwap',
+        [ZrxTradePool.PancakeSwapV2]: 'PancakeSwap V2',
+        [ZrxTradePool.QuickSwap]: 'QuickSwap',
+        [ZrxTradePool.Saddle]: 'Saddle',
+        [ZrxTradePool.Shell]: 'Shell',
+        [ZrxTradePool.Smoothy]: 'Smoothy',
+        [ZrxTradePool.SnowSwap]: 'SnowSwap',
+        [ZrxTradePool.SushiSwap]: 'SushiSwap',
+        [ZrxTradePool.Swerve]: 'Swerve',
+        [ZrxTradePool.Uniswap]: 'Uniswap',
+        [ZrxTradePool.UniswapV2]: 'Uniswap V2',
+        [ZrxTradePool.UniswapV3]: 'Uniswap V3',
+        [ZrxTradePool.WaultSwap]: 'WaultSwap',
+        [ZrxTradePool.xSigma]: 'xSigma',
+    },
+    'Unknown',
+)

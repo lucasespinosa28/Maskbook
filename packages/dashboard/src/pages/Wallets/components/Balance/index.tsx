@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { experimentalStyled as styled, Typography, Box, Button, buttonClasses } from '@material-ui/core'
+import { styled, Typography, Box, Button, buttonClasses } from '@material-ui/core'
 import { useDashboardI18N } from '../../../../locales'
 import { MaskColorVar } from '@masknet/theme'
 import { MaskWalletIcon, SendIcon, CardIcon, SwapIcon, DownloadIcon } from '@masknet/icons'
@@ -82,10 +82,12 @@ export const Balance = memo<BalanceCardProps>(({ balance, onSend, onBuy, onSwap,
                 <BalanceDisplayContainer>
                     <BalanceTitle>{t.wallets_balance()}</BalanceTitle>
                     <BalanceContent>
-                        {balance.toLocaleString('en', {
-                            style: 'currency',
-                            currency: 'USD',
-                        })}
+                        {isNaN(balance)
+                            ? '-'
+                            : balance.toLocaleString('en', {
+                                  style: 'currency',
+                                  currency: 'USD',
+                              })}
                     </BalanceContent>
                 </BalanceDisplayContainer>
             </Box>

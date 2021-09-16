@@ -9,8 +9,6 @@ import {
     TransactionStateType,
     useAccount,
     useChainId,
-    useGasPrice,
-    useNonce,
     useTokenConstants,
     useTransactionState,
 } from '@masknet/web3-shared'
@@ -63,7 +61,7 @@ function checkParams(
     if (paramsObj.shares <= 0) {
         setCreateState?.({
             type: TransactionStateType.FAILED,
-            error: Error('At least 1 person should be able to claim the red packet.'),
+            error: new Error('At least 1 person should be able to claim the red packet.'),
         })
         return false
     }
@@ -71,7 +69,7 @@ function checkParams(
     if (paramsObj.tokenType !== EthereumTokenType.Native && paramsObj.tokenType !== EthereumTokenType.ERC20) {
         setCreateState?.({
             type: TransactionStateType.FAILED,
-            error: Error('Token not supported'),
+            error: new Error('Token not supported'),
         })
         return false
     }
@@ -107,30 +105,24 @@ export function useCreateParams(redPacketSettings: RedPacketSettings | undefined
 
         if (!checkParams(paramsObj)) return null
 
-        const params = Object.values(omit(paramsObj, ['token'])) as Parameters<
-            HappyRedPacketV4['methods']['create_red_packet']
-        >
+        type MethodParameters = Parameters<HappyRedPacketV4['methods']['create_red_packet']>
+        const params = Object.values(omit(paramsObj, ['token'])) as MethodParameters
 
         let gasError = null as Error | null
         const value = new BigNumber(paramsObj.token?.type === EthereumTokenType.Native ? total : '0').toFixed()
 
-        const gas = (await (redPacketContract as HappyRedPacketV4).methods
+        const gas = await (redPacketContract as HappyRedPacketV4).methods
             .create_red_packet(...params)
-            .estimateGas({
-                from: account,
-                value,
+            .estimateGas({ from: account, value })
+            .catch((error: Error) => {
+                gasError = error
             })
-            .catch((err: Error) => {
-                gasError = err
-            })) as number | undefined
 
-        return { gas, params, paramsObj, gasError }
+        return { gas: gas as number | undefined, params, paramsObj, gasError }
     }, [redPacketSettings, account, redPacketContract]).value
 }
 
 export function useCreateCallback(redPacketSettings: RedPacketSettings, version: number) {
-    const nonce = useNonce()
-    const gasPrice = useGasPrice()
     const account = useAccount()
     const chainId = useChainId()
     const [createState, setCreateState] = useTransactionState()
@@ -172,8 +164,6 @@ export function useCreateCallback(redPacketSettings: RedPacketSettings, version:
             from: account,
             value,
             gas,
-            gasPrice,
-            nonce,
         }
 
         // send transaction and wait for hash
@@ -210,7 +200,7 @@ export function useCreateCallback(redPacketSettings: RedPacketSettings, version:
                 reject(error)
             })
         })
-    }, [nonce, gasPrice, account, redPacketContract, redPacketSettings, chainId, paramResult])
+    }, [account, redPacketContract, redPacketSettings, chainId, paramResult])
 
     const resetCallback = useCallback(() => {
         setCreateState({

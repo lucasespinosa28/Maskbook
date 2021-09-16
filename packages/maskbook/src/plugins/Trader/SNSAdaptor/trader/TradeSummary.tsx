@@ -1,20 +1,13 @@
 import { useContext, useState } from 'react'
 import BigNumber from 'bignumber.js'
-import {
-    IconButton,
-    List,
-    ListItem,
-    ListItemSecondaryAction,
-    ListItemText,
-    makeStyles,
-    Paper,
-    Typography,
-} from '@material-ui/core'
+import { IconButton, List, ListItem, ListItemSecondaryAction, ListItemText, Paper, Typography } from '@material-ui/core'
+import { makeStyles } from '@masknet/theme'
+import { TradeProvider } from '@masknet/public-api'
 import LoopIcon from '@material-ui/icons/Loop'
 import { formatBalance, formatPercentage, isGreaterThan, pow10, FungibleTokenDetailed } from '@masknet/web3-shared'
 import { ONE_BIPS } from '../../constants'
 import { useStylesExtends } from '@masknet/shared'
-import { SwapQuoteResponse, TradeComputed, TradeProvider, TradeStrategy } from '../../types'
+import { SwapQuoteResponse, TradeComputed, TradeStrategy } from '../../types'
 import { resolveUniswapWarningLevel, resolveUniswapWarningLevelColor, resolveZrxTradePoolName } from '../../pipes'
 import { TradeContext } from '../../trader/useTradeContext'
 
@@ -24,7 +17,7 @@ type SummaryRecord = {
     children?: React.ReactNode
 } | null
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles()((theme) => ({
     root: {
         width: '100%',
         boxSizing: 'border-box',
@@ -60,7 +53,7 @@ const useStyles = makeStyles((theme) => ({
     },
 }))
 
-export interface TradeSummaryProps extends withClasses<never> {
+export interface TradeSummaryProps extends withClasses<'root'> {
     trade: TradeComputed
     provider: TradeProvider
     inputToken: FungibleTokenDetailed
@@ -222,7 +215,7 @@ export function TradeSummary(props: TradeSummaryProps) {
             <List className={classes.list} component="ul">
                 {[
                     ...records,
-                    ...(context?.IS_UNISWAP_LIKE ? uniswapRecords : []),
+                    ...(context?.IS_UNISWAP_V2_LIKE || context?.IS_UNISWAP_V3_LIKE ? uniswapRecords : []),
                     ...(provider === TradeProvider.BALANCER ? balancerRecords : []),
                     ...(provider === TradeProvider.ZRX ? zrxRecords : []),
                 ].map((record) =>

@@ -1,6 +1,6 @@
 import { postsContentSelector } from '../utils/selector'
 import { IntervalWatcher } from '@dimensiondev/holoflows-kit'
-import { creator, SocialNetworkUI as Next } from '../../../social-network'
+import { activatedSocialNetworkUI, creator, globalUIState, SocialNetworkUI as Next } from '../../../social-network'
 import type { PostInfo } from '../../../social-network/PostInfo'
 import { postIdParser } from '../utils/fetch'
 import { memoize } from 'lodash-es'
@@ -20,27 +20,53 @@ import {
 import { twitterBase } from '../base'
 import { twitterShared } from '../shared'
 import { createRefsForCreatePostContext } from '../../../social-network/utils/create-post-context'
+import { currentSelectedIdentity } from '../../../settings/settings'
 
 function registerPostCollectorInner(
     postStore: Next.CollectingCapabilities.PostsProvider['posts'],
     cancel: AbortSignal,
 ) {
     const getTweetNode = (node: HTMLElement) => {
-        return node.closest<HTMLDivElement>(
+        const root = node.closest<HTMLDivElement>(
             [
-                '.tweet',
-                '.main-tweet',
                 'article > div',
                 'div[role="link"]', // retweet in new twitter
             ].join(),
         )
+        if (!root) return null
+
+        const isCardNode = node.matches('[data-testid="card.wrapper"]')
+        const hasTextNode = !!root.querySelector(
+            [
+                '[data-testid="tweet"] div[lang]', // timeline
+                '[data-testid="tweet"] + div div[lang]', // detailed
+            ].join(),
+        )
+
+        // if a text node already exists, it's not going to decrypt the card node
+        if (isCardNode && hasTextNode) return null
+
+        return root
+    }
+
+    const getCurrentIdentifier = () => {
+        const current = currentSelectedIdentity[activatedSocialNetworkUI.networkIdentifier]
+        return (
+            globalUIState.profiles.value.find((i) => i.identifier.toText() === current.value) ||
+            globalUIState.profiles.value[0]
+        )
     }
     const updateProfileInfo = memoize(
         (info: PostInfo) => {
-            Services.Identity.updateProfileInfo(info.postBy.getCurrentValue(), {
+            const currentProfile = getCurrentIdentifier()
+            const profileIdentifier = info.postBy.getCurrentValue()
+            Services.Identity.updateProfileInfo(profileIdentifier, {
                 nickname: info.nickname.getCurrentValue(),
                 avatarURL: info.avatarURL.getCurrentValue(),
             })
+            if (currentProfile?.linkedPersona) {
+                Services.Identity.createNewRelation(profileIdentifier, currentProfile.linkedPersona.identifier)
+            }
         },
         (info: PostInfo) => info.postBy.getCurrentValue()?.toText(),
     )
@@ -89,7 +115,7 @@ function registerPostCollectorInner(
 }
 
 export const PostProviderTwitter: Next.CollectingCapabilities.PostsProvider = {
-    posts: creator.PostProviderStore(),
+    posts: creator.EmptyPostProviderState(),
     start(cancel) {
         registerPostCollectorInner(this.posts, cancel)
     },

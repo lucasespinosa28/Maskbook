@@ -63,7 +63,7 @@ export function EthereumChainBoundary(props: EthereumChainBoundaryProps) {
             return
         }
 
-        // request ethereum-compatiable network
+        // request ethereum-compatible network
         const networkType = getNetworkTypeFromChainId(expectedChainId)
         if (!networkType) return
         try {
@@ -80,7 +80,7 @@ export function EthereumChainBoundary(props: EthereumChainBoundaryProps) {
                     ? Services.Ethereum.switchEthereumChain(ChainId.Mainnet, overrides)
                     : Services.Ethereum.addEthereumChain(chainDetailedCAIP, account, overrides),
             ])
-        } catch (e) {
+        } catch {
             throw new Error(`Make sure your wallet is on the ${resolveNetworkName(networkType)} network.`)
         }
     }, [account, isAllowed, providerType, expectedChainId])
@@ -94,8 +94,6 @@ export function EthereumChainBoundary(props: EthereumChainBoundaryProps) {
 
     // is the actual chain id a valid one even if it does not match with the expected one?
     const isValid = props?.isValidChainId?.(actualChainId, expectedChainId) ?? false
-
-    if (isMatched || isValid) return <>{props.children}</>
 
     if (!account)
         return (
@@ -113,12 +111,14 @@ export function EthereumChainBoundary(props: EthereumChainBoundaryProps) {
             </Box>
         )
 
+    if (isMatched || isValid) return <>{props.children}</>
+
     if (!isAllowed)
         return (
             <Box display="flex" flexDirection="column" alignItems="center" sx={{ paddingTop: 1, paddingBottom: 1 }}>
                 <Typography color="textPrimary">
                     <span>
-                        {t('plugin_wallet_not_availabe_on', {
+                        {t('plugin_wallet_not_available_on', {
                             network: actualNetwork,
                         })}
                     </span>
@@ -131,7 +131,7 @@ export function EthereumChainBoundary(props: EthereumChainBoundaryProps) {
             {!noSwitchNetworkTip ? (
                 <Typography color="textPrimary">
                     <span>
-                        {t('plugin_wallet_not_availabe_on', {
+                        {t('plugin_wallet_not_available_on', {
                             network: actualNetwork,
                         })}
                     </span>

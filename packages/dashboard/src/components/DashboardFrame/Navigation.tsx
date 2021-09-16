@@ -6,16 +6,27 @@ import {
     Collapse,
     Theme,
     useMediaQuery,
-    experimentalStyled as styled,
+    styled,
     listItemClasses,
     listItemIconClasses,
     ListItemProps,
+    listItemTextClasses,
 } from '@material-ui/core'
-import { Masks, AccountBalanceWallet, ExpandLess, ExpandMore, Settings } from '@material-ui/icons'
+import { ExpandLess, ExpandMore } from '@material-ui/icons'
 import { useContext } from 'react'
 import { useMatch, useNavigate } from 'react-router'
 import { DashboardContext } from './context'
-import { MaskNotSquareIcon } from '@masknet/icons'
+import {
+    MaskNotSquareIcon,
+    MenuLabsActiveIcon,
+    MenuLabsIcon,
+    MenuPersonasActiveIcon,
+    MenuPersonasIcon,
+    MenuSettingsActiveIcon,
+    MenuSettingsIcon,
+    MenuWalletsActiveIcon,
+    MenuWalletsIcon,
+} from '@masknet/icons'
 import { useDashboardI18N } from '../../locales'
 import { MaskColorVar } from '@masknet/theme'
 import { RoutePaths } from '../../type'
@@ -79,6 +90,23 @@ const ListItem = styled(MuiListItem)(({ theme }) => ({
     },
 }))
 
+const ListSubTextItem = styled(ListItemText)(({ theme }) => ({
+    [`&.${listItemTextClasses.inset}`]: {
+        marginLeft: theme.spacing(2),
+        '&:before': {
+            content: '""',
+            display: 'inline-block',
+            width: 4,
+            height: 4,
+            borderRadius: 2,
+            background: 'currentColor',
+            position: 'absolute',
+            left: theme.spacing(9),
+            top: 22,
+        },
+    },
+}))
+
 export interface NavigationProps {}
 export function Navigation({}: NavigationProps) {
     const { expanded, toggleNavigationExpand } = useContext(DashboardContext)
@@ -95,33 +123,37 @@ export function Navigation({}: NavigationProps) {
             )}
             <ListItemLink to={RoutePaths.Personas}>
                 <ListItemIcon>
-                    <Masks />
+                    {useMatch(RoutePaths.Personas) ? <MenuPersonasActiveIcon /> : <MenuPersonasIcon />}
                 </ListItemIcon>
                 <ListItemText primary={t.personas()} />
             </ListItemLink>
-            <ListItemLink
-                to={RoutePaths.Wallets}
-                selected={!!useMatch(RoutePaths.Wallets)}
-                onClick={toggleNavigationExpand}>
+            <ListItemLink to="" selected={!!useMatch(RoutePaths.Wallets)} onClick={toggleNavigationExpand}>
                 <ListItemIcon>
-                    <AccountBalanceWallet />
+                    {useMatch(RoutePaths.Wallets) ? <MenuWalletsActiveIcon /> : <MenuWalletsIcon />}
                 </ListItemIcon>
                 <ListItemText>{t.wallets()}</ListItemText>
                 {expanded ? <ExpandLess /> : <ExpandMore />}
             </ListItemLink>
             <Collapse in={expanded}>
                 <List disablePadding>
+                    <ListItemLink to={RoutePaths.Wallets}>
+                        <ListSubTextItem inset primary={t.wallets_assets()} />
+                    </ListItemLink>
                     <ListItemLink to={RoutePaths.WalletsTransfer}>
-                        <ListItemText inset primary={t.wallets_transfer()} />
+                        <ListSubTextItem inset primary={t.wallets_transfer()} />
                     </ListItemLink>
                     <ListItemLink to={RoutePaths.WalletsHistory}>
-                        <ListItemText inset primary={t.wallets_history()} />
+                        <ListSubTextItem inset primary={t.wallets_history()} />
                     </ListItemLink>
                 </List>
             </Collapse>
+            <ListItemLink to={RoutePaths.Labs}>
+                <ListItemIcon>{useMatch(RoutePaths.Labs) ? <MenuLabsActiveIcon /> : <MenuLabsIcon />}</ListItemIcon>
+                <ListItemText primary={t.labs()} />
+            </ListItemLink>
             <ListItemLink to={RoutePaths.Settings}>
                 <ListItemIcon>
-                    <Settings />
+                    {useMatch(RoutePaths.Settings) ? <MenuSettingsActiveIcon /> : <MenuSettingsIcon />}
                 </ListItemIcon>
                 <ListItemText primary={t.settings()} />
             </ListItemLink>

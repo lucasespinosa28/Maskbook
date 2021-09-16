@@ -1,7 +1,16 @@
+import type { TransactionConfig as TransactionConfig_ } from 'web3-core'
 import type { NonPayableTransactionObject, PayableTransactionObject } from '@masknet/web3-contracts/types/types'
 
 export enum CurrencyType {
     USD = 'usd',
+}
+
+export interface PriceRecord {
+    [currency: string]: number
+}
+/** Base on response of coingecko's token price API */
+export interface CryptoPrice {
+    [token: string]: PriceRecord
 }
 
 // bigint is not in our list. iOS doesn't support that.
@@ -24,6 +33,13 @@ export enum ChainId {
     // Matic
     Matic = 137,
     Mumbai = 80001,
+
+    // Arbitrum
+    Arbitrum = 42161,
+    Arbitrum_Rinkeby = 421611,
+
+    // xDai
+    xDai = 100,
 }
 
 export enum ProviderType {
@@ -32,11 +48,14 @@ export enum ProviderType {
     WalletConnect = 'WalletConnect',
     CustomNetwork = 'CustomNetwork',
 }
-
+// If you change this enum, please sync it to packages/public-api/src/web.ts
+// (it's a breaking change. Please notify the iOS and Android dev)
 export enum NetworkType {
     Ethereum = 'Ethereum',
     Binance = 'Binance',
     Polygon = 'Polygon',
+    Arbitrum = 'Arbitrum',
+    xDai = 'xDai',
 }
 
 export interface Wallet {
@@ -95,21 +114,31 @@ export interface ERC721Token {
     address: string
     chainId: ChainId
 }
-export interface ERC721TokenDetailed extends ERC721Token {
+
+export interface ERC721ContractDetailed extends ERC721Token {
     name: string
     symbol: string
-    tokenId: string
     baseURI?: string
-    tokenURI?: string
+    iconURL?: string
 }
 
-export interface ERC721TokenAssetDetailed extends ERC721TokenDetailed {
-    asset?: {
-        name?: string
-        description?: string
-        image?: string
-    }
+export interface ERC721TokenInfo {
+    name?: string
+    description?: string
+    image?: string
+    owner?: string
 }
+
+export interface ERC721TokenDetailed {
+    tokenId: string
+    info: ERC721TokenInfo
+    contractDetailed: ERC721ContractDetailed
+}
+
+export interface ERC721TokenRecordInDatabase extends ERC721TokenDetailed {
+    record_id: string
+}
+
 //#endregion
 
 //#region ERC1155
@@ -154,7 +183,7 @@ interface TokenDetailedMap {
 }
 
 interface TokenAssetDetailedMap {
-    [EthereumTokenType.ERC721]: ERC721TokenAssetDetailed
+    [EthereumTokenType.ERC721]: ERC721TokenDetailed
     [EthereumTokenType.ERC1155]: ERC1155TokenAssetDetailed
 }
 
@@ -163,6 +192,16 @@ export type EthereumTokenDetailedType<T extends EthereumTokenType> = TokenDetail
 export type TokenAssetDetailedType<T extends EthereumTokenType.ERC721 | EthereumTokenType.ERC1155> =
     TokenAssetDetailedMap[T]
 
+// Learn more: https://eips.ethereum.org/EIPS/eip-747
+export interface EthereumAssetDetailed {
+    type: string // ERC20
+    options: {
+        address: string
+        symbol?: string
+        decimals?: number
+        image?: string
+    }
+}
 export interface EthereumChainDetailed {
     chainId: string // A 0x-prefixed hexadecimal string
     chainName: string
@@ -182,14 +221,31 @@ export enum EthereumTokenType {
     ERC1155 = 3,
 }
 
+export type EIP1559GasConfig = {
+    gas: number
+    maxFeePerGas: number
+    maxPriorityFeePerGas: number
+}
+
+export type PriorEIP1559GasConfig = {
+    gas: number
+    gasPrice: number
+}
+
+export type GasConfig = EIP1559GasConfig | PriorEIP1559GasConfig
+
 // Learn more for a full list of supported JSON RPC methods
 // https://eth.wiki/json-rpc/API#json-rpc-methods
 export enum EthereumMethodType {
+    WATCH_ASSET = 'wallet_watchAsset',
+    WATCH_ASSET_LEGACY = 'metamask_watchAsset',
     PERSONAL_SIGN = 'personal_sign',
     WALLET_ADD_ETHEREUM_CHAIN = 'wallet_addEthereumChain',
     WALLET_SWITCH_ETHEREUM_CHAIN = 'wallet_switchEthereumChain',
+    ETH_ACCOUNTS = 'eth_accounts',
     ETH_SEND_TRANSACTION = 'eth_sendTransaction',
     ETH_SEND_RAW_TRANSACTION = 'eth_sendRawTransaction',
+    ETH_GET_CODE = 'eth_getCode',
     ETH_GAS_PRICE = 'eth_gasPrice',
     ETH_BLOCK_NUMBER = 'eth_blockNumber',
     ETH_GET_BALANCE = 'eth_getBalance',
@@ -197,10 +253,166 @@ export enum EthereumMethodType {
     ETH_GET_TRANSACTION_RECEIPT = 'eth_getTransactionReceipt',
     ETH_GET_TRANSACTION_COUNT = 'eth_getTransactionCount',
     ETH_ESTIMATE_GAS = 'eth_estimateGas',
+    ETH_CALL = 'eth_call',
     ETH_SIGN = 'eth_sign',
+    ETH_DECRYPT = 'eth_decrypt',
+    ETH_SIGN_TYPED_DATA = 'eth_signTypedData',
     ETH_SIGN_TRANSACTION = 'eth_signTransaction',
     ETH_GET_LOGS = 'eth_getLogs',
+    ETH_GET_ENCRYPTION_PUBLIC_KEY = 'eth_getEncryptionPublicKey',
 }
+
+export type EthereumTransactionConfig = TransactionConfig_ & {
+    // EIP1159
+    maxFeePerGas?: string
+    maxPriorityFeePerGas?: string
+}
+
+// RPC need to be confirmed by the user
+export enum EthereumRpcType {
+    // transaction
+    CANCEL = 'cancel',
+    RETRY = 'retry', // speed up
+
+    // contract interaction
+    SEND_ETHER = 'sendEther',
+    CONTRACT_INTERACTION = 'contractInteraction',
+    CONTRACT_DEPLOYMENT = 'contractDeployment',
+
+    // asset
+    WATCH_ASSET = 'wallet_watchAsset',
+
+    // wallet
+    WALLET_SWITCH_ETHEREUM_CHAIN = 'wallet_switchEthereumChain',
+
+    // sign
+    SIGN = 'eth_sign',
+    SIGN_TYPED_DATA = 'eth_signTypedData',
+
+    // decrypt
+    ETH_DECRYPT = 'eth_decrypt',
+    ETH_GET_ENCRYPTION_PUBLIC_KEY = 'eth_getEncryptionPublicKey',
+}
+
+export type EthereumRpcComputed =
+    | {
+          type: EthereumRpcType.CANCEL | EthereumRpcType.RETRY
+
+          /**
+           * The replacement transaction
+           */
+          tx: EthereumTransactionConfig
+
+          /**
+           * The original transaction config
+           */
+          _tx: EthereumTransactionConfig
+      }
+    | {
+          type: EthereumRpcType.SEND_ETHER
+
+          /**
+           * The original transaction config
+           */
+          _tx: EthereumTransactionConfig
+      }
+    | {
+          type: EthereumRpcType.CONTRACT_DEPLOYMENT
+
+          /**
+           * code in bytes
+           */
+          code: string
+
+          /**
+           * The original transaction config
+           */
+          _tx: EthereumTransactionConfig
+      }
+    | {
+          type: EthereumRpcType.CONTRACT_INTERACTION
+
+          /**
+           * the method type name of the invoked contract
+           */
+          name: string
+
+          /**
+           * parameters in an array of bytes (only built-in abis)
+           */
+          parameters?: {
+              [key in string]?: string
+          }
+
+          /**
+           * The original transaction config
+           */
+          _tx: EthereumTransactionConfig
+      }
+    | {
+          type: EthereumRpcType.SIGN
+
+          /**
+           * the sign to address
+           */
+          to: string
+
+          /**
+           * the original message
+           */
+          data: string
+      }
+    | {
+          type: EthereumRpcType.SIGN_TYPED_DATA
+
+          /**
+           * the sign to address
+           */
+          to: string
+
+          /**
+           * typed data
+           */
+          data: any
+      }
+    | {
+          type: EthereumRpcType.ETH_GET_ENCRYPTION_PUBLIC_KEY
+
+          /**
+           * the account address
+           */
+          account: string
+      }
+    | {
+          type: EthereumRpcType.ETH_DECRYPT
+
+          /**
+           * the decrypt to address
+           * Learn more: https://docs.metamask.io/guide/rpc-api.html#eth-decrypt
+           */
+          to: string
+
+          /**
+           * the secret message
+           */
+          secret: string
+      }
+    | {
+          type: EthereumRpcType.WALLET_SWITCH_ETHEREUM_CHAIN
+
+          /**
+           * the chain detailed
+           */
+          chain?: EthereumChainDetailed
+      }
+    | {
+          type: EthereumRpcType.WATCH_ASSET
+
+          /**
+           * the asset detailed
+           */
+          asset: EthereumAssetDetailed
+      }
 
 export enum TransactionEventType {
     TRANSACTION_HASH = 'transactionHash',
@@ -210,9 +422,9 @@ export enum TransactionEventType {
 }
 
 export enum TransactionStatusType {
-    NOT_DEPEND,
-    SUCCEED,
-    FAILED,
+    NOT_DEPEND = 0,
+    SUCCEED = 1,
+    FAILED = 2,
 }
 
 export type GasNow = {
@@ -248,13 +460,18 @@ export interface Asset {
     logoURI?: string
 }
 
+export enum DomainProvider {
+    ENS = 'ENS',
+    UNS = 'UNS',
+}
+
 export enum PortfolioProvider {
-    ZERION,
-    DEBANK,
+    ZERION = 0,
+    DEBANK = 1,
 }
 
 export enum CollectibleProvider {
-    OPENSEAN,
+    OPENSEA = 0,
 }
 
 export type UnboxTransactionObject<T> = T extends NonPayableTransactionObject<infer R>
@@ -262,3 +479,70 @@ export type UnboxTransactionObject<T> = T extends NonPayableTransactionObject<in
     : T extends PayableTransactionObject<infer S>
     ? S
     : T
+
+export enum FilterTransactionType {
+    ALL = 'all',
+    SEND = 'send',
+    RECEIVE = 'receive',
+    CREATE_RED_PACKET = 'create_red_packet',
+    FILL_POOL = 'fill_pool',
+}
+
+export enum TransactionType {
+    SEND = 'Send',
+    RECEIVE = 'Receive',
+    TRANSFER = 'transfer',
+    CREATE_RED_PACKET = 'create_red_packet',
+    FILL_POOL = 'fill_pool',
+}
+
+export enum DebankTransactionDirection {
+    SEND = 'send',
+    RECEIVE = 'receive',
+}
+
+export enum ZerionTransactionDirection {
+    IN = 'in',
+    OUT = 'out',
+    SELF = 'self',
+}
+
+export type TransactionDirection = ZerionTransactionDirection | DebankTransactionDirection
+
+export interface TransactionPair {
+    name: string
+    symbol: string
+    address: string
+    direction: TransactionDirection
+    amount: number
+}
+
+export type TransactionGasFee = {
+    eth: number
+    usd: number
+}
+
+export interface Transaction {
+    type: string | undefined
+    id: string
+    timeAt: Date
+    toAddress: string
+    failed: boolean
+    pairs: TransactionPair[]
+    gasFee: TransactionGasFee | undefined
+    transactionType: string
+}
+
+//#region address name
+export enum AddressNameType {
+    ENS = 'ENS',
+    UNS = 'UNS',
+    DNS = 'DNS',
+}
+
+export interface AddressName {
+    label: string
+    ownerAddress: string
+    resolvedAddress?: string
+}
+//#endregion

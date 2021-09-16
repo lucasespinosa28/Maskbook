@@ -1,11 +1,11 @@
 import { Box, Button, IconButton, Typography } from '@material-ui/core'
-import { Alert, AlertTitle, experimentalStyled as styled } from '@material-ui/core'
+import { Alert, AlertTitle, styled } from '@material-ui/core'
 import { useMemo, useState } from 'react'
 import ExpandLess from '@material-ui/icons/ExpandLess'
 import ExpandMore from '@material-ui/icons/ExpandMore'
 import { useContext } from 'react'
 import { ErrorBoundaryBuildInfoContext, ErrorBoundaryError } from './context'
-import { useMaskThemeI18N } from '../../../locales'
+import { useSharedI18N } from '../../../locales'
 
 export type CrashUIProps = ErrorBoundaryError & {
     /** Type of the Error */
@@ -20,7 +20,7 @@ export type CrashUIProps = ErrorBoundaryError & {
 }
 export function CrashUI({ onRetry, subject, ...error }: CrashUIProps) {
     const context = useContext(ErrorBoundaryBuildInfoContext)
-    const t = useMaskThemeI18N()
+    const t = useSharedI18N()
 
     const [showStack, setShowStack] = useState(false)
 
@@ -29,7 +29,7 @@ export function CrashUI({ onRetry, subject, ...error }: CrashUIProps) {
     const reportBody: string = `<!--Thanks for the crash report!
 Please write down what you're doing when the crash happened, that will help us to fix it easier!-->
 
-I was *doing something...*, then Mask report an error.
+I was *doing something...*, then Mask reports an error.
 
 > ${error.message}
 

@@ -9,15 +9,15 @@ export function pollingTask(
     } = {},
 ) {
     let canceled = !autoStart
-    let timer: NodeJS.Timeout
+    let timer: number
 
     const runTask = async () => {
         if (canceled) return
         let stop = false
         try {
             stop = await task()
-        } catch (e) {
-            console.error(e)
+        } catch (error) {
+            console.error(error)
         }
         if (!stop) resetTask()
     }

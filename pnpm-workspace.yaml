@@ -2,9 +2,13 @@
 # webpack config.resolve.alias
 packages:
   - 'packages/empty'
+  - 'packages/polyfills/types'
   - 'packages/scripts'
   - 'packages/dashboard'
   - 'packages/maskbook'
+  - 'packages/injected-script'
+  - 'packages/mask-sdk'
+  - 'packages/public-api'
   - 'packages/shared-base'
   - 'packages/shared'
   - 'packages/web3-constants'
@@ -18,3 +22,4 @@ packages:
   - 'packages/plugins/Wallet'
   - 'packages/external-plugin-previewer'
   - 'packages/encryption'
+  - 'packages/backup-format'

@@ -15,6 +15,7 @@ import { startPluginSNSAdaptor } from '@masknet/plugin-infra'
 import { getCurrentSNSNetwork } from '../social-network-adaptor/utils'
 import { createPluginHost } from '../plugin-infra/host'
 import { definedSocialNetworkUIs } from './define'
+import { MaskMessage } from '../utils/messages'
 
 const definedSocialNetworkUIsResolved = new Map<string, SocialNetworkUI.Definition>()
 export let activatedSocialNetworkUI: SocialNetworkUI.Definition = {
@@ -70,13 +71,24 @@ export async function activateSocialNetworkUIInner(ui_deferred: SocialNetworkUI.
 
     ui.collecting.postsProvider?.start(signal)
     startPostListener()
-
+    ui.collecting.currentVisitingIdentityProvider?.start(signal)
     ui.injection.pageInspector?.(signal)
     if (Flags.toolbox_enabled) ui.injection.toolBoxInNavBar?.(signal)
     ui.injection.setupPrompt?.(signal)
     ui.injection.newPostComposition?.start?.(signal)
     ui.injection.searchResult?.(signal)
     ui.injection.userBadge?.(signal)
+
+    setTimeout(activateSNSAdaptorPluginOnStart, 1000)
+
+    ui.injection.enhancedProfile?.(signal)
+    ui.injection.enhancedProfileTab?.(signal)
+
+    ui.injection.userAvatar?.(signal)
+    ui.injection.profileAvatar?.(signal)
+    if (Flags.nft_avatar_enabled) {
+        ui.injection.enhancedProfileNFTAvatar?.(signal)
+    }
 
     startPluginSNSAdaptor(getCurrentSNSNetwork(ui.networkIdentifier), createPluginHost(signal))
 
@@ -98,7 +110,7 @@ export async function activateSocialNetworkUIInner(ui_deferred: SocialNetworkUI.
         const provider = ui.collecting.identityProvider
         provider?.start(signal)
         if (provider?.hasDeprecatedPlaceholderName) {
-            provider.lastRecognized.addListener((id) => {
+            provider.recognized.addListener((id) => {
                 if (signal.aborted) return
                 if (id.identifier.isUnknown) return
                 Services.Identity.resolveIdentity(id.identifier)
@@ -146,6 +158,18 @@ export async function activateSocialNetworkUIInner(ui_deferred: SocialNetworkUI.
         currentSetupGuideStatus[network].addListener(onStatusUpdate)
         currentSetupGuideStatus[network].readyPromise.then(onStatusUpdate)
         onStatusUpdate(id)
+    }
+
+    async function activateSNSAdaptorPluginOnStart() {
+        const plugin = await Services.Settings.shouldActivatePluginOnSNSStart()
+        if (!plugin) return
+
+        await delay(500)
+        MaskMessage.events.requestComposition.sendToLocal({
+            open: true,
+            reason: 'timeline',
+            options: plugin === 'none' ? {} : { startupPlugin: plugin },
+        })
     }
 }
 

@@ -1,16 +1,17 @@
 import { formatBalance, resolveTokenLinkOnExplorer, useChainId } from '@masknet/web3-shared'
-import { Grid, Link, makeStyles, Paper, Typography } from '@material-ui/core'
+import { Grid, Link, Paper, Typography } from '@material-ui/core'
+import { makeStyles } from '@masknet/theme'
 import { isNative } from 'lodash-es'
 import ActionButton from '../../../extension/options-page/DashboardComponents/ActionButton'
-import { Flags, useI18N } from '../../../utils'
-import { RedPacketSettings, useCreateParams } from './hooks/useCreateCallback'
-import { TxFeeEstimation } from '../../../web3/UI/TxFeeEstimation'
+import { useI18N } from '../../../utils'
+import type { RedPacketSettings } from './hooks/useCreateCallback'
 import LaunchIcon from '@material-ui/icons/Launch'
 import { FormattedBalance } from '@masknet/shared'
 import BigNumber from 'bignumber.js'
+import classNames from 'classnames'
 import { useEffect } from 'react'
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles()((theme) => ({
     link: {
         display: 'flex',
         marginLeft: theme.spacing(0.5),
@@ -18,6 +19,10 @@ const useStyles = makeStyles((theme) => ({
     grid: {
         paddingTop: theme.spacing(2),
         paddingBottom: theme.spacing(2),
+    },
+    gridWrapper: {
+        paddingLeft: theme.spacing(3),
+        paddingRight: theme.spacing(3),
     },
     hit: {
         fontSize: 14,
@@ -65,16 +70,15 @@ export interface ConfirmRedPacketFormProps {
 export function RedPacketConfirmDialog(props: ConfirmRedPacketFormProps) {
     const { t } = useI18N()
     const { onBack, settings, onCreate, onClose } = props
-    const classes = useStyles()
+    const { classes } = useStyles()
     const chainId = useChainId()
-    const paramsResult = useCreateParams(settings, 4)
 
     useEffect(() => {
         if (settings?.token?.chainId !== chainId) onClose()
     }, [chainId, onClose])
 
     return (
-        <Grid container spacing={2} className={classes.grid}>
+        <Grid container spacing={2} className={classNames(classes.grid, classes.gridWrapper)}>
             <Grid item xs={12}>
                 <Typography variant="h4" color="textPrimary" align="center">
                     {settings?.message}
@@ -157,9 +161,6 @@ export function RedPacketConfirmDialog(props: ConfirmRedPacketFormProps) {
                     />
                 </Typography>
             </Grid>
-            {Flags.wallet_gas_price_dialog_enable && paramsResult?.gas ? (
-                <TxFeeEstimation classes={classes} gas={paramsResult?.gas} />
-            ) : null}
             <Grid item xs={12}>
                 <Paper className={classes.hit}>
                     <Typography variant="body1" color="textPrimary" align="center">

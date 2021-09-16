@@ -8,9 +8,10 @@ import {
     useChainId,
     useGitcoinConstants,
     useNativeTokenDetailed,
-    useTokenBalance,
+    useFungibleTokenBalance,
 } from '@masknet/web3-shared'
-import { DialogContent, Link, makeStyles, Typography } from '@material-ui/core'
+import { DialogContent, Link, Typography } from '@material-ui/core'
+import { makeStyles } from '@masknet/theme'
 import BigNumber from 'bignumber.js'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Trans } from 'react-i18next'
@@ -28,7 +29,7 @@ import { SelectTokenDialogEvent, WalletMessages } from '../../Wallet/messages'
 import { useDonateCallback } from '../hooks/useDonateCallback'
 import { PluginGitcoinMessages } from '../messages'
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles()((theme) => ({
     paper: {
         width: '450px !important',
     },
@@ -81,7 +82,7 @@ export function DonateDialog(props: DonateDialogProps) {
     const [token = nativeTokenDetailed.value, setToken] = useState<FungibleTokenDetailed | undefined>(
         nativeTokenDetailed.value,
     )
-    const tokenBalance = useTokenBalance(token?.type ?? EthereumTokenType.Native, token?.address ?? '')
+    const tokenBalance = useFungibleTokenBalance(token?.type ?? EthereumTokenType.Native, token?.address ?? '')
     //#endregion
 
     //#region select token dialog
@@ -125,7 +126,7 @@ export function DonateDialog(props: DonateDialogProps) {
                 ? [
                       `I just donated ${title} with ${formatBalance(amount, token.decimals)} ${cashTag}${
                           token.symbol
-                      }. Follow @realMaskbook (mask.io) to donate Gitcoin grants.`,
+                      }. Follow @realMaskNetwork (mask.io) to donate Gitcoin grants.`,
                       '#mask_io',
                   ].join('\n')
                 : '',

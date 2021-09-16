@@ -3,7 +3,6 @@ import { pollingTask } from '@masknet/shared'
 import { getBalance, getBlockNumber, resetAllNonce } from '../../../extension/background-script/EthereumService'
 import { startEffects } from '../../../utils'
 import { UPDATE_CHAIN_STATE_DELAY } from '../constants'
-import { getWallet } from './wallet'
 import {
     currentAccountSettings,
     currentBalanceSettings,
@@ -11,8 +10,13 @@ import {
     currentChainIdSettings,
     currentProviderSettings,
 } from '../settings'
+import { getGasPriceDict } from '../apis/debank'
 
 const beats: true[] = []
+
+export function getGasPriceDictFromDeBank(chain: string) {
+    return getGasPriceDict(chain)
+}
 
 export async function kickToUpdateChainState() {
     beats.push(true)
@@ -27,12 +31,11 @@ export async function updateChainState() {
 
     // update chain state
     try {
-        const wallet = await getWallet()
         ;[currentBlockNumberSettings.value, currentBalanceSettings.value] = await Promise.all([
             getBlockNumber(),
-            wallet ? getBalance(wallet.address) : currentBalanceSettings.value,
+            currentAccountSettings.value ? getBalance(currentAccountSettings.value) : currentBalanceSettings.value,
         ])
-    } catch (error) {
+    } catch {
         // do nothing
     } finally {
         // reset the polling if chain state updated successfully

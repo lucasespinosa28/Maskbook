@@ -1,4 +1,5 @@
-import { makeStyles, MenuItem, Typography } from '@material-ui/core'
+import { CircularProgress, MenuItem, MenuItemProps, Typography } from '@material-ui/core'
+import { makeStyles } from '@masknet/theme'
 import classNames from 'classnames'
 import {
     useAccount,
@@ -7,19 +8,22 @@ import {
     useChainIdValid,
     useWallet,
     formatEthereumAddress,
+    TransactionStatusType,
 } from '@masknet/web3-shared'
-import { useActivatedPluginSNSAdaptorWithOperatingChainSupportedMet } from '@masknet/plugin-infra'
+import {
+    useActivatedPluginSNSAdaptorWithOperatingChainSupportedMet,
+    useActivatedPluginsSNSAdaptor,
+} from '@masknet/plugin-infra'
 import FiberManualRecordIcon from '@material-ui/icons/FiberManualRecord'
 import { MaskbookSharpIconOfSize, WalletSharp } from '../../resources/MaskbookIcon'
 import { ToolIconURLs } from '../../resources/tool-icon'
 import { Image } from '../shared/Image'
 import { useMenu } from '../../utils/hooks/useMenu'
-import { useCallback } from 'react'
+import { forwardRef, useRef, useCallback } from 'react'
 import { MaskMessage } from '../../utils/messages'
-import { RedPacketPluginID } from '../../plugins/RedPacket/constants'
-import { ITO_PluginID } from '../../plugins/ITO/constants'
-import { FileServicePluginID } from '../../plugins/FileService/constants'
-import { useControlledDialog } from '../../plugins/Collectible/SNSAdaptor/useControlledDialog'
+import { PLUGIN_ID as TransakPluginID } from '../../plugins/Transak/constants'
+import { PLUGIN_IDENTIFIER as TraderPluginID } from '../../plugins/Trader/constants'
+import { useControlledDialog } from '../../utils/hooks/useControlledDialog'
 import { useRemoteControlledDialog, useStylesExtends } from '@masknet/shared'
 import { PluginTransakMessages } from '../../plugins/Transak/messages'
 import { PluginTraderMessages } from '../../plugins/Trader/messages'
@@ -28,96 +32,99 @@ import { Flags } from '../../utils/flags'
 import { ClaimAllDialog } from '../../plugins/ITO/SNSAdaptor/ClaimAllDialog'
 import { WalletIcon } from '../shared/WalletIcon'
 import { useI18N } from '../../utils'
-import { base as ITO_Plugin } from '../../plugins/ITO/base'
-import { base as RedPacket_Plugin } from '../../plugins/RedPacket/base'
+import { safeUnreachable } from '@dimensiondev/kit'
+import { usePluginI18NField } from '../../plugin-infra/I18NFieldRender'
+import { useRecentTransactions } from '../../plugins/Wallet/hooks/useRecentTransactions'
 
-const useStyles = makeStyles((theme) => ({
-    paper: {
-        borderRadius: 4,
-        transform: 'translateY(-150px) !important',
-        boxShadow: `${
-            theme.palette.mode === 'dark'
-                ? 'rgba(255, 255, 255, 0.2) 0px 0px 15px, rgba(255, 255, 255, 0.15) 0px 0px 3px 1px'
-                : 'rgba(101, 119, 134, 0.2) 0px 0px 15px, rgba(101, 119, 134, 0.15) 0px 0px 3px 1px'
-        }`,
-        backgroundImage: 'none',
-    },
-    menu: {
-        paddingTop: 0,
-        paddingBottom: 0,
-    },
-
-    wrapper: {
-        display: 'flex',
-        alignItems: 'center',
-        width: '100%',
-        cursor: 'pointer',
-        [theme.breakpoints.down('lg')]: {
-            transform: 'translateX(0px)',
+const useStyles = makeStyles()(({ palette, breakpoints, spacing }) => {
+    const isDark = palette.mode === 'dark'
+    return {
+        paper: {
+            borderRadius: 4,
+            transform: 'translateY(-150px) !important',
+            boxShadow: `${
+                isDark
+                    ? 'rgba(255, 255, 255, 0.2) 0px 0px 15px, rgba(255, 255, 255, 0.15) 0px 0px 3px 1px'
+                    : 'rgba(101, 119, 134, 0.2) 0px 0px 15px, rgba(101, 119, 134, 0.15) 0px 0px 3px 1px'
+            }`,
+            backgroundImage: 'none',
         },
-        '&:hover': {
-            '& $title': {
-                color: theme.palette.primary.main,
+        menu: {
+            paddingTop: 0,
+            paddingBottom: 0,
+        },
+        wrapper: {
+            display: 'flex',
+            alignItems: 'center',
+            width: '100%',
+            cursor: 'pointer',
+            [breakpoints.down('lg')]: {
+                transform: 'translateX(0px)',
             },
-            '& $icon': {
-                color: theme.palette.primary.main,
+            '&:hover': {
+                '& $title': {
+                    color: palette.primary.main,
+                },
+                '& $icon': {
+                    color: palette.primary.main,
+                },
             },
         },
-    },
-    button: {
-        display: 'flex',
-        padding: '12px 26px 12px 14px',
-        borderRadius: 50,
-        justifyContent: 'center',
-        alignItems: 'center',
-        [theme.breakpoints.down('lg')]: {
-            transform: 'translateX(0px)',
-            padding: 14,
+        button: {
+            display: 'flex',
+            padding: '12px 26px 12px 14px',
+            borderRadius: 50,
+            justifyContent: 'center',
+            alignItems: 'center',
+            [breakpoints.down('lg')]: {
+                transform: 'translateX(0px)',
+                padding: 14,
+            },
         },
-    },
-    title: {
-        display: 'flex',
-        alignItems: 'center',
-        color: theme.palette.mode === 'dark' ? 'rgb(255, 255, 255)' : 'rgb(15, 20, 25)',
-        fontWeight: 700,
-        fontSize: 20,
-        marginLeft: 22,
-        lineHeight: 1.35,
-        [theme.breakpoints.down('lg')]: {
-            display: 'none',
+        title: {
+            display: 'flex',
+            alignItems: 'center',
+            color: isDark ? palette.text.primary : 'rgb(15, 20, 25)',
+            fontSize: 20,
+            marginLeft: 22,
+            lineHeight: 1.35,
+            [breakpoints.down('lg')]: {
+                display: 'none',
+            },
         },
-    },
-    menuItem: {},
-    text: {
-        color: theme.palette.mode === 'dark' ? 'rgb(255, 255, 255)' : 'rgb(15, 20, 25)',
-        marginLeft: 22,
-    },
-    iconWrapper: {
-        position: 'relative',
-        height: 24,
-        width: 24,
-    },
-    icon: {
-        color: theme.palette.mode === 'dark' ? 'rgb(255, 255, 255)' : 'rgb(15, 20, 25)',
-        width: 24,
-        height: 24,
-        fontSize: 24,
-    },
-    mask: {
-        color: theme.palette.mode === 'dark' ? 'rgb(255, 255, 255)' : 'rgb(15, 20, 25)',
-        width: 22,
-        height: 22,
-        fontSize: 22,
-    },
-    chainIcon: {
-        fontSize: 18,
-        width: 18,
-        height: 18,
-        marginLeft: theme.spacing(0.5),
-    },
-}))
+        menuItem: {},
+        text: {
+            color: isDark ? palette.text.primary : 'rgb(15, 20, 25)',
+            marginLeft: 22,
+        },
+        iconWrapper: {
+            position: 'relative',
+            height: 24,
+            width: 24,
+        },
+        icon: {
+            color: isDark ? palette.text.primary : 'rgb(15, 20, 25)',
+            width: 24,
+            height: 24,
+            fontSize: 24,
+        },
+        mask: {
+            color: isDark ? palette.text.primary : 'rgb(15, 20, 25)',
+            width: 22,
+            height: 22,
+            fontSize: 22,
+        },
+        chainIcon: {
+            fontSize: 18,
+            width: 18,
+            height: 18,
+            marginLeft: spacing(0.5),
+        },
+    }
+})
 
-interface ToolboxHintProps extends withClasses<never> {}
+interface ToolboxHintProps extends withClasses<'wrapper' | 'menuItem' | 'title' | 'text' | 'button' | 'icon'> {}
+
 export function ToolboxHint(props: ToolboxHintProps) {
     const { t } = useI18N()
     const classes = useStylesExtends(useStyles(), props)
@@ -128,9 +135,20 @@ export function ToolboxHint(props: ToolboxHintProps) {
     const chainDetailed = useChainDetailed()
     const operatingSupportedChainMapping = useActivatedPluginSNSAdaptorWithOperatingChainSupportedMet()
 
+    //#region recent pending transactions
+    const { value: pendingTransactions = [] } = useRecentTransactions(TransactionStatusType.NOT_DEPEND)
+    //#endregion
+
     //#region Encrypted message
     const openEncryptedMessage = useCallback(
-        () => MaskMessage.events.compositionUpdated.sendToLocal({ reason: 'timeline', open: true }),
+        (id?: string) =>
+            MaskMessage.events.requestComposition.sendToLocal({
+                reason: 'timeline',
+                open: true,
+                options: {
+                    startupPlugin: id,
+                },
+            }),
         [],
     )
     //#endregion
@@ -144,34 +162,8 @@ export function ToolboxHint(props: ToolboxHintProps) {
     )
     //#endregion
 
-    //#region Red packet
-    const openRedPacket = useCallback(() => {
-        openEncryptedMessage()
-        setTimeout(() => {
-            MaskMessage.events.activatePluginCompositionEntry.sendToLocal(RedPacketPluginID)
-        })
-    }, [openEncryptedMessage])
-    //#endregion
-
-    //#region File Service
-    const openFileService = useCallback(() => {
-        openEncryptedMessage()
-        setTimeout(() => {
-            MaskMessage.events.activatePluginCompositionEntry.sendToLocal(FileServicePluginID)
-        })
-    }, [openEncryptedMessage])
-    //#endregion
-
-    //#region ITO
-    const openITO = useCallback(() => {
-        openEncryptedMessage()
-        setTimeout(() => {
-            MaskMessage.events.activatePluginCompositionEntry.sendToLocal(ITO_PluginID)
-        })
-    }, [openEncryptedMessage])
-    //#endregion
-
     //#region Buy currency
+    const transakPluginEnabled = useActivatedPluginsSNSAdaptor().find((x) => x.ID === TransakPluginID)
     const { setDialog: setBuyDialog } = useRemoteControlledDialog(PluginTransakMessages.buyTokenDialogUpdated)
     const openBuyCurrency = useCallback(() => {
         setBuyDialog({
@@ -182,6 +174,7 @@ export function ToolboxHint(props: ToolboxHintProps) {
     //#endregion
 
     //#region Swap
+    const swapPluginEnabled = useActivatedPluginsSNSAdaptor().find((x) => x.ID === TraderPluginID)
     const { openDialog: openSwapDialog } = useRemoteControlledDialog(PluginTraderMessages.swapDialogUpdated)
     //#endregion
 
@@ -193,47 +186,53 @@ export function ToolboxHint(props: ToolboxHintProps) {
     } = useControlledDialog()
     //#endregion
 
+    const items: ToolboxItemDescriptor[] = [
+        { ...ToolIconURLs.encryptedmsg, onClick: () => openEncryptedMessage() },
+        {
+            ...ToolIconURLs.token,
+            onClick: openBuyCurrency,
+            hide: !(account && Flags.transak_enabled && transakPluginEnabled),
+        },
+        {
+            ...ToolIconURLs.swap,
+            onClick: openSwapDialog,
+            hide: !(chainIdValid && swapPluginEnabled),
+        },
+        {
+            ...ToolIconURLs.claim,
+            onClick: onClaimAllDialogOpen,
+            hide: !account,
+        },
+    ]
+
+    const pluginI18N = usePluginI18NField()
+    useActivatedPluginsSNSAdaptor().forEach((plugin) => {
+        if (!plugin.ToolbarEntry) return
+        const { image, label, onClick: onClickRaw, priority, useShouldDisplay } = plugin.ToolbarEntry
+
+        let onClick: () => void
+        if (onClickRaw === 'openCompositionEntry') {
+            onClick = () => openEncryptedMessage(plugin.ID)
+        } else {
+            safeUnreachable(onClickRaw)
+            onClick = () => {}
+        }
+
+        items.push({
+            onClick,
+            image,
+            label: typeof label === 'string' ? label : pluginI18N(plugin.ID, label),
+            priority,
+            useShouldDisplay,
+            hide: !operatingSupportedChainMapping[plugin.ID],
+        })
+    })
+
     const [menu, openMenu] = useMenu(
-        [
-            <MenuItem onClick={openEncryptedMessage} className={classes.menuItem}>
-                <Image src={ToolIconURLs.encryptedmsg.image} width={19} height={19} />
-                <Typography className={classes.text}>{ToolIconURLs.encryptedmsg.text}</Typography>
-            </MenuItem>,
-            operatingSupportedChainMapping[RedPacket_Plugin.ID] ? (
-                <MenuItem onClick={openRedPacket} className={classes.menuItem}>
-                    <Image src={ToolIconURLs.redpacket.image} width={19} height={19} />
-                    <Typography className={classes.text}>{ToolIconURLs.redpacket.text}</Typography>
-                </MenuItem>
-            ) : null,
-            <MenuItem onClick={openFileService} className={classes.menuItem}>
-                <Image src={ToolIconURLs.files.image} width={19} height={19} />
-                <Typography className={classes.text}>{ToolIconURLs.files.text}</Typography>
-            </MenuItem>,
-            operatingSupportedChainMapping[ITO_Plugin.ID] ? (
-                <MenuItem onClick={openITO} className={classes.menuItem}>
-                    <Image src={ToolIconURLs.markets.image} width={19} height={19} />
-                    <Typography className={classes.text}>{ToolIconURLs.markets.text}</Typography>
-                </MenuItem>
-            ) : null,
-            account && Flags.transak_enabled ? (
-                <MenuItem onClick={openBuyCurrency} className={classes.menuItem}>
-                    <Image src={ToolIconURLs.token.image} width={19} height={19} />
-                    <Typography className={classes.text}>{ToolIconURLs.token.text}</Typography>
-                </MenuItem>
-            ) : null,
-            chainIdValid ? (
-                <MenuItem onClick={openSwapDialog} className={classes.menuItem}>
-                    <Image src={ToolIconURLs.swap.image} width={19} height={19} />
-                    <Typography className={classes.text}>{ToolIconURLs.swap.text}</Typography>
-                </MenuItem>
-            ) : null,
-            operatingSupportedChainMapping[ITO_Plugin.ID] ? (
-                <MenuItem onClick={onClaimAllDialogOpen} className={classes.menuItem}>
-                    <Image src={ToolIconURLs.claim.image} width={19} height={19} />
-                    <Typography className={classes.text}>{ToolIconURLs.claim.text}</Typography>
-                </MenuItem>
-            ) : null,
-        ],
+        items
+            .filter((x) => x.hide !== true)
+            .sort((a, b) => b.priority - a.priority)
+            .map((desc) => <ToolboxItem className={classes.menuItem} {...desc} />),
         false,
         {
             paperProps: {
@@ -246,6 +245,22 @@ export function ToolboxHint(props: ToolboxHintProps) {
     )
 
     const isWalletValid = !!account && selectedWallet && chainIdValid
+
+    function renderButtonText() {
+        if (!account) return t('plugin_wallet_on_connect')
+        if (!chainIdValid) return t('plugin_wallet_wrong_network')
+        if (pendingTransactions.length <= 0) return formatEthereumAddress(account, 4)
+        return (
+            <>
+                <span>
+                    {t('plugin_wallet_pending_transactions', {
+                        count: pendingTransactions.length,
+                    })}
+                </span>
+                <CircularProgress sx={{ marginLeft: 1.5 }} thickness={6} size={20} color="inherit" />
+            </>
+        )
+    }
 
     return (
         <>
@@ -262,11 +277,7 @@ export function ToolboxHint(props: ToolboxHintProps) {
                     {isWalletValid ? <WalletIcon /> : <WalletSharp classes={{ root: classes.icon }} size={24} />}
 
                     <Typography className={classes.title}>
-                        {account
-                            ? chainIdValid
-                                ? formatEthereumAddress(account, 4)
-                                : t('plugin_wallet_wrong_network')
-                            : t('plugin_wallet_on_connect')}
+                        {renderButtonText()}
                         {account && chainIdValid && chainDetailed?.network !== 'mainnet' ? (
                             <FiberManualRecordIcon
                                 className={classes.chainIcon}
@@ -284,3 +295,27 @@ export function ToolboxHint(props: ToolboxHintProps) {
         </>
     )
 }
+
+interface ToolboxItemDescriptor {
+    onClick: () => void
+    image: string
+    label: string
+    hide?: boolean
+    priority: number
+    useShouldDisplay?(): boolean
+}
+// TODO: this should be rendered in the ErrorBoundary
+const ToolboxItem = forwardRef<any, MenuItemProps & ToolboxItemDescriptor>((props, ref) => {
+    const { image, label, hide, priority, useShouldDisplay, ...rest } = props
+    const { classes } = useStyles()
+    const shouldDisplay = useRef(useShouldDisplay || (() => true)).current() && !hide
+
+    if (!shouldDisplay) return null
+
+    return (
+        <MenuItem ref={ref} {...rest}>
+            <Image src={image} width={19} height={19} />
+            <Typography className={classes.text}>{label}</Typography>
+        </MenuItem>
+    )
+})

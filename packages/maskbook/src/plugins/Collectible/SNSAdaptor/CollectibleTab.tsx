@@ -1,15 +1,14 @@
-import { makeStyles, Card, CardContent, CardProps } from '@material-ui/core'
+import { Card, CardContent, CardProps } from '@material-ui/core'
+import { makeStyles } from '@masknet/theme'
 import { useStylesExtends } from '@masknet/shared'
 
-const useStyles = makeStyles((theme) => {
-    return {
-        root: {
-            width: '100%',
-            height: '100%',
-            borderRadius: 0,
-        },
-        content: {},
-    }
+const useStyles = makeStyles()({
+    root: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 0,
+        overflow: 'scroll',
+    },
 })
 
 export interface CollectibleTabProps extends withClasses<'root' | 'content'> {

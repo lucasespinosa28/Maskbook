@@ -1,7 +1,7 @@
 import { MutationObserverWatcher, ValueRef } from '@dimensiondev/holoflows-kit'
 import { useValueRef } from '@masknet/shared'
 import { Appearance } from '@masknet/theme'
-import { makeStyles, PaletteMode, ThemeProvider, unstable_createMuiStrictModeTheme } from '@material-ui/core'
+import { PaletteMode, ThemeProvider, unstable_createMuiStrictModeTheme } from '@material-ui/core'
 import produce, { setAutoFreeze } from 'immer'
 import { createElement, useMemo } from 'react'
 import type { SocialNetworkUI } from '../../../social-network'
@@ -9,6 +9,7 @@ import { useClassicMaskTheme } from '../../../utils/theme'
 import { fromRGB, getBackgroundColor, getForegroundColor, isDark, shade, toRGB } from '../../../utils/theme-tools'
 import { isMobileTwitter } from '../utils/isMobile'
 import { composeAnchorSelector, composeAnchorTextSelector } from '../utils/selector'
+import twitterColorSchema from './twitter-color-schema.json'
 
 const primaryColorRef = new ValueRef(toRGB([29, 161, 242]))
 const primaryColorContrastColorRef = new ValueRef(toRGB([255, 255, 255]))
@@ -53,12 +54,20 @@ export function useThemeTwitterVariant() {
 
         const TwitterTheme = produce(MaskbookTheme, (theme) => {
             theme.palette.background.paper = backgroundColor
+            const isDark = theme.palette.mode === 'dark'
+            const isDarker = backgroundColor === 'rgb(0,0,0)'
             theme.palette.primary = {
                 light: toRGB(shade(primaryColorRGB, 10)),
                 main: toRGB(primaryColorRGB),
                 dark: toRGB(shade(primaryColorRGB, -10)),
                 contrastText: toRGB(primaryContrastColorRGB),
             }
+            const themeName = isDark ? (isDarker ? 'darker' : 'dark') : 'light'
+            const colorSchema = twitterColorSchema[themeName]
+            const colors = Object.keys(colorSchema) as Array<keyof typeof colorSchema>
+            colors.forEach((color) => {
+                Object.assign(theme.palette[color], colorSchema[color])
+            })
             theme.shape.borderRadius = isMobileTwitter ? 0 : 15
             theme.breakpoints.values = { xs: 0, sm: 687, md: 1024, lg: 1280, xl: 1920 }
             theme.components = theme.components || {}
@@ -118,73 +127,3 @@ export function TwitterThemeProvider(props: Required<React.PropsWithChildren<{}>
     if (!process.env.STORYBOOK) throw new Error('This API is only for Storybook!')
     return createElement(ThemeProvider, { theme: useThemeTwitterVariant(), ...props })
 }
-
-export const useInjectedDialogClassesOverwriteTwitter = makeStyles((theme) => ({
-    root: {
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        [`@media (max-width: ${theme.breakpoints.values.sm}px)`]: {
-            display: 'block !important',
-        },
-    },
-    container: {
-        alignItems: 'center',
-    },
-    paper: {
-        width: '600px !important',
-        maxWidth: 'none',
-        boxShadow: 'none',
-        backgroundImage: 'none',
-        [`@media (max-width: ${theme.breakpoints.values.sm}px)`]: {
-            '&': {
-                display: 'block !important',
-                borderRadius: '0 !important',
-            },
-        },
-    },
-    dialogTitle: {
-        display: 'flex',
-        alignItems: 'center',
-        padding: '10px 15px',
-        borderBottom: `1px solid ${theme.palette.mode === 'dark' ? '#2f3336' : '#ccd6dd'}`,
-        '& > h2': {
-            display: 'inline-block',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-        },
-        [`@media (max-width: ${theme.breakpoints.values.sm}px)`]: {
-            '&': {
-                display: 'flex',
-                justifyContent: 'space-between',
-                maxWidth: 600,
-                margin: '0 auto',
-                padding: '7px 14px 6px 11px !important',
-            },
-        },
-    },
-    dialogContent: {
-        [`@media (max-width: ${theme.breakpoints.values.sm}px)`]: {
-            display: 'flex',
-            flexDirection: 'column',
-            maxWidth: 600,
-            margin: '0 auto',
-            padding: '7px 14px 6px !important',
-        },
-    },
-    dialogActions: {
-        padding: '10px 15px',
-        [`@media (max-width: ${theme.breakpoints.values.sm}px)`]: {
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            maxWidth: 600,
-            margin: '0 auto',
-            padding: '7px 14px 6px !important',
-        },
-    },
-    dialogBackdropRoot: {
-        backgroundColor: theme.palette.mode === 'dark' ? 'rgba(110, 118, 125, 0.4)' : 'rgba(0, 0, 0, 0.4)',
-    },
-}))

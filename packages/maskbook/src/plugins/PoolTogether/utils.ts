@@ -1,5 +1,6 @@
 import { ChainId } from '@masknet/web3-shared'
-import { ONE_SECOND, ONE_WEEK_SECONDS } from './constants'
+import type { I18NFunction } from '../../utils'
+import { ONE_DAY_SECONDS, ONE_SECOND, ONE_WEEK_SECONDS } from './constants'
 import type { Pool } from './types'
 
 export const calculateOdds = (usersTicketBalance: number, totalSupply: number, numberOfWinners: number) => {
@@ -25,18 +26,23 @@ export const calculateNextPrize = (pool: Pool) => {
     if (!Number.isNaN(rawPrize)) {
         return '$' + rawPrize.toLocaleString(undefined, { maximumFractionDigits: 0 })
     } else {
-        const pirzeAmount = Number.parseFloat(pool.prize.amount)
-        const formattedPirzeAmount = pirzeAmount.toLocaleString(undefined, {
-            maximumFractionDigits: pirzeAmount >= 10 ? 0 : 2,
+        const prizeAmount = Number.parseFloat(pool.prize.amount)
+        const formattedPrizeAmount = prizeAmount.toLocaleString(undefined, {
+            maximumFractionDigits: prizeAmount >= 10 ? 0 : 2,
         })
-        return `${formattedPirzeAmount} ${pool.tokens.underlyingToken.symbol}`
+        return `${formattedPrizeAmount} ${pool.tokens.underlyingToken.symbol}`
     }
 }
 
 export const calculateSecondsRemaining = (pool: Pool) => {
-    const startedAt = Number.parseInt(pool.prize.prizePeriodStartedAt.hex, 16)
-    const seconds = Number.parseInt(pool.prize.prizePeriodSeconds.hex, 16)
-    return startedAt + seconds - Date.now() / ONE_SECOND
+    if (pool.prize.prizePeriodEndAt) {
+        const endAt = Number.parseInt(pool.prize.prizePeriodEndAt, 10)
+        return endAt - Date.now() / ONE_SECOND
+    } else {
+        const startedAt = Number.parseInt(pool.prize.prizePeriodStartedAt.hex, 16)
+        const seconds = Number.parseInt(pool.prize.prizePeriodSeconds.hex, 16)
+        return startedAt + seconds - Date.now() / ONE_SECOND
+    }
 }
 
 export const getNetworkColor = (chainId: ChainId) => {
@@ -49,4 +55,13 @@ export const getNetworkColor = (chainId: ChainId) => {
         default:
             return '#f1f1f1'
     }
+}
+
+export function getPrizePeriod(t: I18NFunction, period: number) {
+    if (period === ONE_DAY_SECONDS) {
+        return t('daily')
+    } else if (period === ONE_WEEK_SECONDS) {
+        return t('weekly')
+    }
+    return t('days', { period: (period / ONE_WEEK_SECONDS).toFixed() })
 }

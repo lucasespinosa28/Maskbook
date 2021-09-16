@@ -1,7 +1,6 @@
-import { Dispatch, memo, SetStateAction, useState } from 'react'
+import { Dispatch, memo, SetStateAction, useCallback, useState } from 'react'
 import {
     Box,
-    makeStyles,
     Pagination,
     PaginationItem,
     Table,
@@ -11,16 +10,20 @@ import {
     TableHead,
     TableRow,
 } from '@material-ui/core'
-import { MaskColorVar } from '@masknet/theme'
+import { makeStyles, MaskColorVar } from '@masknet/theme'
 import { useDashboardI18N } from '../../../../locales'
 import { EmptyPlaceholder } from '../EmptyPlaceholder'
-import { LoadingPlaceholder } from '../LoadingPlacholder'
+import { LoadingPlaceholder } from '../../../../components/LoadingPlaceholder'
 import { TokenTableRow } from '../TokenTableRow'
-import { Asset, formatBalance, useAssets, useERC20TokensPaged } from '@masknet/web3-shared'
+import { Asset, formatBalance, FungibleTokenDetailed, useAssets, useERC20TokensPaged } from '@masknet/web3-shared'
 import BigNumber from 'bignumber.js'
 import { ceil } from 'lodash-es'
+import { useRemoteControlledDialog } from '@masknet/shared'
+import { PluginMessages } from '../../../../API'
+import { RoutePaths } from '../../../../type'
+import { useNavigate } from 'react-router'
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles()((theme) => ({
     container: {
         height: 'calc(100% - 58px)',
         display: 'flex',
@@ -30,8 +33,9 @@ const useStyles = makeStyles((theme) => ({
     header: {
         color: MaskColorVar.normalText,
         fontWeight: theme.typography.fontWeightRegular,
-        padding: '24px 28px',
+        padding: '36px 0 12px',
         backgroundColor: MaskColorVar.primaryBackground,
+        border: 'none',
     },
     footer: {
         flex: 1,
@@ -54,16 +58,39 @@ const useStyles = makeStyles((theme) => ({
     },
 }))
 
+// todo: show asset by chain
 export const TokenTable = memo(() => {
-    const [page, setPage] = useState(1)
+    const navigate = useNavigate()
 
+    const [page, setPage] = useState(1)
     const { value } = useERC20TokensPaged(page - 1, 50)
+    const { setDialog: openSwapDialog } = useRemoteControlledDialog(PluginMessages.Swap.swapDialogUpdated)
 
     const {
         error: detailedTokensError,
         loading: detailedTokensLoading,
         value: detailedTokens,
     } = useAssets(value?.tokens || [])
+
+    const onSwap = useCallback((token: FungibleTokenDetailed) => {
+        openSwapDialog({
+            open: true,
+            traderProps: {
+                coin: {
+                    id: token.address,
+                    name: token.name ?? '',
+                    symbol: token.symbol ?? '',
+                    contract_address: token.address,
+                    decimals: token.decimals,
+                },
+            },
+        })
+    }, [])
+
+    const onSend = useCallback(
+        (token: FungibleTokenDetailed) => navigate(RoutePaths.WalletsTransfer, { state: { token } }),
+        [],
+    )
 
     return (
         <TokenTableUI
@@ -74,6 +101,8 @@ export const TokenTable = memo(() => {
             showPagination={!detailedTokensLoading && !detailedTokensError && !!detailedTokens.length}
             dataSource={detailedTokens}
             count={ceil((!!value?.count ? value.count : 1) / 50) ?? 1}
+            onSwap={onSwap}
+            onSend={onSend}
         />
     )
 })
@@ -86,13 +115,14 @@ export interface TokenTableUIProps {
     showPagination: boolean
     dataSource: Asset[]
     count: number
+    onSwap(token: FungibleTokenDetailed): void
+    onSend(token: FungibleTokenDetailed): void
 }
 
 export const TokenTableUI = memo<TokenTableUIProps>(
-    ({ page, onPageChange, isLoading, isEmpty, showPagination, dataSource, count }) => {
+    ({ page, onSwap, onSend, onPageChange, isLoading, isEmpty, showPagination, dataSource, count }) => {
         const t = useDashboardI18N()
-        const classes = useStyles()
-
+        const { classes } = useStyles()
         return (
             <>
                 <TableContainer className={classes.container}>
@@ -139,7 +169,12 @@ export const TokenTableUI = memo<TokenTableUIProps>(
                                             return Number(firstValue.lt(secondValue))
                                         })
                                         .map((asset, index) => (
-                                            <TokenTableRow asset={asset} key={index} />
+                                            <TokenTableRow
+                                                onSend={() => onSend(asset.token)}
+                                                onSwap={() => onSwap(asset.token)}
+                                                asset={asset}
+                                                key={index}
+                                            />
                                         ))}
                                 </TableBody>
                             ) : null}

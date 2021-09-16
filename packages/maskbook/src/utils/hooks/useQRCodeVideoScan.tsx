@@ -6,9 +6,9 @@ import { useInterval } from 'react-use'
 import { useQueryNavigatorPermission } from './useQueryNavigatorPermission'
 import '../../components/QRScanner/ShapeDetectionPolyfill'
 
-export async function getBackVideoDeviceId() {
+async function getBackVideoDeviceId() {
     const devices = filter(await navigator.mediaDevices.enumerateDevices(), ({ kind }) => kind === 'videoinput')
-    const back = find(devices, ({ label }) => !/Front/i.test(label) && /Back|Rear/i.test(label))
+    const back = find(devices, ({ label }) => !/front/i.test(label) && /back|rear/i.test(label))
     return (back ?? first(devices))?.deviceId ?? null
 }
 
@@ -46,8 +46,8 @@ export function useQRCodeVideoScan(
                     }
                     video.current.srcObject = media
                     video.current.play()
-                } catch (e) {
-                    console.error(e)
+                } catch (error) {
+                    console.error(error)
                     stop()
                 }
             }
@@ -77,7 +77,7 @@ export function useQRCodeVideoScan(
             try {
                 const [result] = await scanner.current.detect(video.current)
                 if (result) onResult?.(result.rawValue)
-            } catch (e) {
+            } catch {
                 errorTimes.current += 1
             } finally {
                 lastScanning.current = false

@@ -2,6 +2,7 @@ import * as bip39 from 'bip39'
 import { EthereumAddress, HDKey } from 'wallet.ts'
 import { BigNumber } from 'bignumber.js'
 import { ec as EC } from 'elliptic'
+import { first } from 'lodash-es'
 import { createTransaction } from '../../../database/helpers/openDB'
 import { createWalletDBAccess } from '../database/Wallet.db'
 import type { WalletRecord } from '../database/types'
@@ -12,6 +13,8 @@ import { getWalletByAddress, WalletRecordIntoDB, WalletRecordOutDB } from './hel
 import { currentAccountSettings, currentProviderSettings } from '../settings'
 import { HD_PATH_WITHOUT_INDEX_ETHEREUM } from '../constants'
 import { updateAccount } from './account'
+import { hasNativeAPI } from '../../../utils/native-rpc'
+import { getAccounts } from '../../../extension/background-script/EthereumService'
 
 function sortWallet(a: WalletRecord, b: WalletRecord) {
     const address = currentAccountSettings.value
@@ -22,6 +25,24 @@ function sortWallet(a: WalletRecord, b: WalletRecord) {
     if (a.createdAt > b.createdAt) return -1
     if (a.createdAt < b.createdAt) return 1
     return 0
+}
+
+function createWalletRecord(address: string, name: string): WalletRecord {
+    const now = new Date()
+    return {
+        address,
+        name,
+        erc20_token_whitelist: new Set(),
+        erc20_token_blacklist: new Set(),
+        erc721_token_whitelist: new Set(),
+        erc721_token_blacklist: new Set(),
+        erc1155_token_whitelist: new Set(),
+        erc1155_token_blacklist: new Set(),
+        mnemonic: [],
+        passphrase: '',
+        createdAt: now,
+        updatedAt: now,
+    }
 }
 
 export async function isEmptyWallets() {
@@ -36,6 +57,13 @@ export async function getWallet(address: string = currentAccountSettings.value) 
 }
 
 export async function getWallets(provider?: ProviderType) {
+    if (hasNativeAPI) {
+        const accounts = await getAccounts()
+        const address = first(accounts) ?? ''
+        if (!address) return []
+        return [createWalletRecord(address, 'Mask Network')]
+    }
+
     const t = createTransaction(await createWalletDBAccess(), 'readonly')('Wallet')
     const records = await t.objectStore('Wallet').getAll()
     const wallets = (
@@ -137,7 +165,7 @@ export function createMnemonicWords() {
 
 export async function importNewWallet(
     rec: PartialRequired<Omit<WalletRecord, 'id' | 'eth_balance' | 'createdAt' | 'updatedAt'>, 'name'>,
-    slient = false,
+    silent = false,
 ) {
     const { name, path, mnemonic = [], passphrase = '' } = rec
     const address = await getWalletAddress()
@@ -166,7 +194,7 @@ export async function importNewWallet(
         else if (!record_.mnemonic.length && !record_._private_key_)
             await t.objectStore('Wallet').put(WalletRecordIntoDB(record))
     }
-    if (!slient) {
+    if (!silent) {
         WalletMessages.events.walletsUpdated.sendToAll(undefined)
         await updateAccount({
             account: record.address,
@@ -183,11 +211,6 @@ export async function importNewWallet(
         if (mnemonic.length) return (await recoverWalletFromMnemonicWords(mnemonic, passphrase, path)).address
         return
     }
-}
-
-export async function importFirstWallet(rec: Parameters<typeof importNewWallet>[0]) {
-    if (await isEmptyWallets()) return importNewWallet(rec)
-    return
 }
 
 export async function renameWallet(address: string, name: string) {
@@ -243,7 +266,7 @@ export async function recoverWalletFromPrivateKey(privateKey: string) {
         mnemonic: [],
     }
     function privateKeyVerify(key: string) {
-        if (!/[0-9a-f]{64}/i.test(key)) return false
+        if (!/[\da-f]{64}/i.test(key)) return false
         const k = new BigNumber(key, 16)
         const n = new BigNumber('fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141', 16)
         return !k.isZero() && k.isLessThan(n)

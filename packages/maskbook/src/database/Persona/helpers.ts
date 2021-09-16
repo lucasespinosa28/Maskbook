@@ -21,13 +21,18 @@ import {
 } from './Persona.db'
 import { IdentifierMap } from '../IdentifierMap'
 import { queryAvatarDataURL } from '../helpers/avatar'
-import { generate_ECDH_256k1_KeyPair_ByMnemonicWord } from '../../utils/mnemonic-code'
+import {
+    generate_ECDH_256k1_KeyPair_ByMnemonicWord,
+    recover_ECDH_256k1_KeyPair_ByMnemonicWord,
+} from '../../utils/mnemonic-code'
 import { deriveLocalKeyFromECDHKey } from '../../utils/mnemonic-code/localKeyGenerate'
 import type {
     EC_Public_JsonWebKey,
     AESJsonWebKey,
     EC_Private_JsonWebKey,
 } from '../../modules/CryptoAlgorithm/interfaces/utils'
+import { validateMnemonic } from 'bip39'
+
 export async function profileRecordToProfile(record: ProfileRecord): Promise<Profile> {
     const rec = { ...record }
     const persona = rec.linkedPersona
@@ -87,6 +92,7 @@ export async function queryPersona(identifier: PersonaIdentifier): Promise<Perso
         updatedAt: new Date(),
         linkedProfiles: new IdentifierMap(new Map(), ProfileIdentifier),
         hasPrivateKey: false,
+        hasLogout: false,
         fingerprint: identifier.compressedPoint,
     }
 }
@@ -119,7 +125,32 @@ export async function deletePersona(id: PersonaIdentifier, confirm: 'delete even
     })
 }
 
+export async function loginPersona(identifier: PersonaIdentifier) {
+    return consistentPersonaDBWriteAccess((t) =>
+        updatePersonaDB(
+            { identifier, hasLogout: false },
+            { linkedProfiles: 'merge', explicitUndefinedField: 'ignore' },
+            t,
+        ),
+    )
+}
+
+export async function logoutPersona(identifier: PersonaIdentifier) {
+    return consistentPersonaDBWriteAccess((t) =>
+        updatePersonaDB(
+            { identifier, hasLogout: true },
+            { linkedProfiles: 'merge', explicitUndefinedField: 'ignore' },
+            t,
+        ),
+    )
+}
+
 export async function renamePersona(identifier: PersonaIdentifier, nickname: string) {
+    const personas = await queryPersonasWithQuery(({ nickname: name }) => name === nickname)
+    if (personas.length > 0) {
+        throw new Error('Nickname already exists')
+    }
+
     return consistentPersonaDBWriteAccess((t) =>
         updatePersonaDB({ identifier, nickname }, { linkedProfiles: 'merge', explicitUndefinedField: 'ignore' }, t),
     )
@@ -176,6 +207,26 @@ export async function createPersonaByMnemonic(
     })
 }
 
+export async function createPersonaByMnemonicV2(mnemonicWord: string, nickname: string | undefined, password: string) {
+    const personas = await queryPersonasWithQuery(({ nickname: name }) => name === nickname)
+    if (personas.length > 0) throw new Error('Nickname already exists')
+
+    const verify = validateMnemonic(mnemonicWord)
+    if (!verify) throw new Error('Verify error')
+
+    const { key, mnemonicRecord: mnemonic } = await recover_ECDH_256k1_KeyPair_ByMnemonicWord(mnemonicWord, password)
+    const { privateKey, publicKey } = key
+    const localKey = await deriveLocalKeyFromECDHKey(publicKey, mnemonic.words)
+    return createPersonaByJsonWebKey({
+        privateKey,
+        publicKey,
+        localKey,
+        mnemonic,
+        nickname,
+        uninitialized: true,
+    })
+}
+
 export async function createPersonaByJsonWebKey(options: {
     publicKey: EC_Public_JsonWebKey
     privateKey: EC_Private_JsonWebKey
@@ -195,6 +246,7 @@ export async function createPersonaByJsonWebKey(options: {
         nickname: options.nickname,
         mnemonic: options.mnemonic,
         localKey: options.localKey,
+        hasLogout: false,
         uninitialized: options.uninitialized,
     }
     await consistentPersonaDBWriteAccess((t) => createPersonaDB(record, t))
@@ -222,6 +274,7 @@ export async function createProfileWithPersona(
         privateKey: keys.privateKey,
         localKey: keys.localKey,
         mnemonic: keys.mnemonic,
+        hasLogout: false,
     }
     await consistentPersonaDBWriteAccess(async (t) => {
         await createOrUpdatePersonaDB(rec, { explicitUndefinedField: 'ignore', linkedProfiles: 'merge' }, t)
@@ -239,4 +292,9 @@ export async function queryLocalKey(i: ProfileIdentifier | PersonaIdentifier): P
     } else {
         return (await queryPersonaDB(i))?.localKey ?? null
     }
+}
+function cover_ECDH_256k1_KeyPair_ByMnemonicWord(
+    password: string,
+): { key: any; mnemonicRecord: any } | PromiseLike<{ key: any; mnemonicRecord: any }> {
+    throw new Error('Function not implemented.')
 }

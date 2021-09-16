@@ -6,9 +6,6 @@ import {
     useAccount,
     useTransactionState,
     TransactionStateType,
-    useNonce,
-    useGasPrice,
-    addGasMargin,
     TransactionEventType,
 } from '@masknet/web3-shared'
 import { usePoolTogetherPoolContract } from '../contracts/usePoolTogetherPool'
@@ -31,8 +28,6 @@ export function useDepositCallback(
     const poolContract = usePoolTogetherPoolContract(address)
 
     const account = useAccount()
-    const nonce = useNonce()
-    const gasPrice = useGasPrice()
     const [depositState, setDepositState] = useTransactionState()
 
     const depositCallback = useCallback(async () => {
@@ -52,8 +47,6 @@ export function useDepositCallback(
         const config = {
             from: account,
             value: new BigNumber(token.type === EthereumTokenType.Native ? amount : 0).toFixed(),
-            gasPrice,
-            nonce,
         }
         const estimatedGas = await poolContract.methods
             .depositTo(account, amount, controlledToken, referrer)
@@ -69,8 +62,8 @@ export function useDepositCallback(
         // step 2: blocking
         return new Promise<string>((resolve, reject) => {
             const promiEvent = poolContract.methods.depositTo(account, amount, controlledToken, referrer).send({
-                gas: addGasMargin(estimatedGas).toFixed(),
                 ...config,
+                gas: estimatedGas,
             })
             promiEvent
                 .on(TransactionEventType.TRANSACTION_HASH, (hash) => {
@@ -88,7 +81,7 @@ export function useDepositCallback(
                     reject(error)
                 })
         })
-    }, [gasPrice, nonce, address, account, amount, token, referrer, controlledToken])
+    }, [address, account, amount, token, referrer, controlledToken])
 
     const resetCallback = useCallback(() => {
         setDepositState({

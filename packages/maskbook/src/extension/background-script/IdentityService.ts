@@ -1,30 +1,60 @@
 import * as bip39 from 'bip39'
-import { queryProfilesWithQuery, personaRecordToPersona, storeAvatar, queryProfile } from '../../database'
-import { ProfileIdentifier, PersonaIdentifier, Identifier, ECKeyIdentifier } from '../../database/type'
-import type { Profile, Persona } from '../../database/Persona/types'
+import { decode, encode } from '@msgpack/msgpack'
+import { blobToArrayBuffer, decodeArrayBuffer, encodeArrayBuffer, decodeText } from '@dimensiondev/kit'
 import {
-    queryPersonaDB,
-    deleteProfileDB,
-    queryPersonasDB,
-    queryProfilesDB,
-    createProfileDB,
+    createPersonaByJsonWebKey,
+    loginPersona,
+    personaRecordToPersona,
+    queryAvatarDataURL,
+    queryPersona,
+    queryPersonaRecord,
+    queryPostPagedDB,
+    queryProfile,
+    queryProfilesWithQuery,
+    storeAvatar,
+} from '../../database'
+import {
+    ECKeyIdentifier,
+    ECKeyIdentifierFromJsonWebKey,
+    Identifier,
+    PersonaIdentifier,
+    ProfileIdentifier,
+} from '../../database/type'
+import type { Persona, Profile } from '../../database/Persona/types'
+import {
     attachProfileDB,
+    consistentPersonaDBWriteAccess,
+    createOrUpdateProfileDB,
+    createProfileDB,
+    createRelationDB,
+    deleteProfileDB,
     LinkedProfileDetails,
     ProfileRecord,
-    createOrUpdateProfileDB,
-    consistentPersonaDBWriteAccess,
+    queryPersonaDB,
+    queryPersonasDB,
+    queryProfilesDB,
+    queryRelationsPagedDB,
+    RelationRecord,
+    updateRelationDB,
 } from '../../database/Persona/Persona.db'
-import { queryPersona } from '../../database'
 import { BackupJSONFileLatest, UpgradeBackupJSONFile } from '../../utils/type-transform/BackupFormat/JSON/latest'
 import { restoreBackup } from './WelcomeServices/restoreBackup'
 import { restoreNewIdentityWithMnemonicWord } from './WelcomeService'
-import { decodeText, decodeArrayBuffer } from '../../utils/type-transform/String-ArrayBuffer'
 import { decompressBackupFile } from '../../utils/type-transform/BackupFileShortRepresentation'
 
 import { assertEnvironment, Environment } from '@dimensiondev/holoflows-kit'
-import type { PersonaInformation, ProfileInformation } from '@masknet/shared'
+import type { EC_JsonWebKey, EC_Private_JsonWebKey, PersonaInformation, ProfileInformation } from '@masknet/shared'
+import { getCurrentPersonaIdentifier } from './SettingsService'
+import { MaskMessage } from '../../utils'
+import type { PostIVIdentifier } from '@masknet/shared-base'
+import { split_ec_k256_keypair_into_pub_priv } from '../../modules/CryptoAlgorithm/helper'
+import { first, orderBy } from 'lodash-es'
+import { recover_ECDH_256k1_KeyPair_ByMnemonicWord } from '../../utils/mnemonic-code'
+import { validateMnemonic } from 'bip39'
+
 assertEnvironment(Environment.ManifestBackground)
 
+export { validateMnemonic } from '../../utils/mnemonic-code'
 export { storeAvatar, queryAvatarDataURL } from '../../database'
 
 //#region Profile
@@ -32,6 +62,10 @@ export { queryProfile, queryProfilePaged } from '../../database'
 
 export function queryProfiles(network?: string): Promise<Profile[]> {
     return queryProfilesWithQuery(network)
+}
+
+export function queryProfilesWithIdentifiers(identifiers: ProfileIdentifier[]) {
+    return queryProfilesWithQuery((record) => identifiers.some((x) => record.identifier.equals(x)))
 }
 export async function queryMyProfiles(network?: string): Promise<Profile[]> {
     const myPersonas = (await queryMyPersonas(network)).filter((x) => !x.uninitialized)
@@ -67,7 +101,30 @@ export function removeProfile(id: ProfileIdentifier): Promise<void> {
 //#endregion
 
 //#region Persona
-export { queryPersona, createPersonaByMnemonic, renamePersona } from '../../database'
+export {
+    queryPersona,
+    createPersonaByMnemonic,
+    createPersonaByMnemonicV2,
+    renamePersona,
+    queryPrivateKey,
+} from '../../database'
+
+export async function queryPersonaByMnemonic(mnemonic: string, password: '') {
+    const verify = validateMnemonic(mnemonic)
+    if (!verify) {
+        throw new Error('Verify error')
+    }
+
+    const { key } = await recover_ECDH_256k1_KeyPair_ByMnemonicWord(mnemonic, password)
+    const identifier = ECKeyIdentifierFromJsonWebKey(key.privateKey, 'public')
+    const persona = await queryPersonaDB(identifier, undefined, true)
+    if (persona) {
+        await loginPersona(persona.identifier)
+        return persona
+    }
+
+    return null
+}
 export async function queryPersonas(identifier?: PersonaIdentifier, requirePrivateKey = false): Promise<Persona[]> {
     if (typeof identifier === 'undefined')
         return (await queryPersonasDB((k) => (requirePrivateKey ? !!k.privateKey : true))).map(personaRecordToPersona)
@@ -75,6 +132,7 @@ export async function queryPersonas(identifier?: PersonaIdentifier, requirePriva
     if (!x || (!x.privateKey && requirePrivateKey)) return []
     return [personaRecordToPersona(x)]
 }
+
 export function queryMyPersonas(network?: string): Promise<Persona[]> {
     return queryPersonas(undefined, true).then((x) =>
         typeof network === 'string'
@@ -86,6 +144,18 @@ export function queryMyPersonas(network?: string): Promise<Persona[]> {
               })
             : x,
     )
+}
+
+export async function queryLastPersonaCreated() {
+    const all = await queryPersonas(undefined, true)
+    return first(orderBy(all, (x) => x.createdAt, 'desc'))
+}
+
+export async function backupPersonaPrivateKey(
+    identifier: PersonaIdentifier,
+): Promise<EC_Private_JsonWebKey | undefined> {
+    const x = await queryPersonaDB(identifier)
+    return x?.privateKey
 }
 
 export async function queryOwnedPersonaInformation(): Promise<PersonaInformation[]> {
@@ -122,6 +192,7 @@ export async function restoreFromMnemonicWords(
     const identifier = await restoreNewIdentityWithMnemonicWord(mnemonicWords, password, {
         nickname,
     })
+
     return queryPersona(identifier)
 }
 export async function restoreFromBase64(base64: string): Promise<Persona | null> {
@@ -136,7 +207,7 @@ export async function restoreFromBackup(backup: string): Promise<Persona | null>
 /**
  * Remove an identity.
  */
-export { setupPersona, deletePersona } from '../../database'
+export { setupPersona, deletePersona, logoutPersona } from '../../database'
 export async function attachProfile(
     source: ProfileIdentifier,
     target: ProfileIdentifier | PersonaIdentifier,
@@ -152,6 +223,58 @@ export async function attachProfile(
 export { detachProfileDB as detachProfile } from '../../database/Persona/Persona.db'
 //#endregion
 
+//#region Post
+export { queryPostsDB } from '../../database'
+
+export async function queryPagedPostHistory(
+    options: {
+        network: string
+        after?: PostIVIdentifier
+    },
+    count: number,
+) {
+    const currentPersona = await getCurrentPersonaIdentifier()
+    if (currentPersona) {
+        return queryPostPagedDB(currentPersona, options, count)
+    }
+
+    return []
+}
+//#endregion
+
+//#region Relation
+export async function createNewRelation(profile: ProfileIdentifier, linked: PersonaIdentifier) {
+    await consistentPersonaDBWriteAccess(async (t) => createRelationDB({ profile, linked, favor: 0 }, t))
+}
+
+export async function queryRelationPaged(
+    options: {
+        network: string
+        after?: RelationRecord
+    },
+    count: number,
+): Promise<RelationRecord[]> {
+    const currentPersona = await getCurrentPersonaIdentifier()
+    if (currentPersona) {
+        return queryRelationsPagedDB(currentPersona, options, count)
+    }
+
+    return []
+}
+
+export async function updateRelation(profile: ProfileIdentifier, linked: PersonaIdentifier, favor: 0 | 1) {
+    await consistentPersonaDBWriteAccess((t) =>
+        updateRelationDB(
+            {
+                profile,
+                linked,
+                favor,
+            },
+            t,
+        ),
+    )
+}
+//#endregion
 /**
  * In older version of Mask, identity is marked as `ProfileIdentifier(network, '$unknown')` or `ProfileIdentifier(network, '$self')`. After upgrading to the newer version of Mask, Mask will try to find the current user in that network and call this function to replace old identifier into a "resolved" identity.
  * @param identifier The resolved identity
@@ -176,3 +299,58 @@ export async function resolveIdentity(identifier: ProfileIdentifier): Promise<vo
         // the profile already exists
     }
 }
+//#endregion
+
+//#region avatar
+export const updateCurrentPersonaAvatar = async (avatar: Blob) => {
+    const identifier = await getCurrentPersonaIdentifier()
+
+    if (identifier) {
+        await storeAvatar(identifier, await blobToArrayBuffer(avatar))
+        MaskMessage.events.personaAvatarChanged.sendToAll({ reason: 'update', of: identifier?.toText() })
+    }
+}
+
+export const getCurrentPersonaAvatar = async () => {
+    const identifier = await getCurrentPersonaIdentifier()
+    if (!identifier) return null
+
+    try {
+        return await queryAvatarDataURL(identifier)
+    } catch {
+        return null
+    }
+}
+//#endregion
+
+//#region Private / Public key
+export async function exportPersonaPrivateKey(identifier: PersonaIdentifier) {
+    const profile = await queryPersonaRecord(identifier)
+    if (!profile?.privateKey) return ''
+
+    const encodePrivateKey = encode(profile.privateKey)
+    return encodeArrayBuffer(encodePrivateKey)
+}
+
+export async function queryPersonaByPrivateKey(privateKeyString: string) {
+    const privateKey = decode(decodeArrayBuffer(privateKeyString)) as EC_JsonWebKey
+    const identifier = ECKeyIdentifierFromJsonWebKey(privateKey, 'public')
+
+    const persona = await queryPersonaDB(identifier, undefined, true)
+    if (persona) {
+        await loginPersona(persona.identifier)
+        return personaRecordToPersona(persona)
+    }
+
+    return null
+}
+
+export async function createPersonaByPrivateKey(privateKeyString: string, nickname: string) {
+    const privateKey = decode(decodeArrayBuffer(privateKeyString)) as EC_JsonWebKey
+    const key = await split_ec_k256_keypair_into_pub_priv(privateKey)
+
+    return createPersonaByJsonWebKey({ privateKey: key.privateKey, publicKey: key.publicKey, nickname })
+}
+//#endregion
+
+export * from './IdentityServices/sign'

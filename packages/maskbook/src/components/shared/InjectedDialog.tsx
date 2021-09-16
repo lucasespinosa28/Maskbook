@@ -6,19 +6,19 @@ import {
     DialogProps,
     DialogTitle,
     IconButton,
-    makeStyles,
     Typography,
     useTheme,
     Dialog,
     useMediaQuery,
 } from '@material-ui/core'
+import { makeStyles, useDialogStackConsumer } from '@masknet/theme'
 import { Children, cloneElement } from 'react'
 import { useI18N, usePortalShadowRoot } from '../../utils'
 import { DialogDismissIconUI } from '../InjectedComponents/DialogDismissIcon'
 import { ErrorBoundary, useStylesExtends, mergeClasses } from '@masknet/shared'
 import { activatedSocialNetworkUI } from '../../social-network'
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles()((theme) => ({
     dialogTitle: {
         padding: theme.spacing(1, 2),
         borderBottom: `1px solid ${theme.palette.divider}`,
@@ -28,6 +28,9 @@ const useStyles = makeStyles((theme) => ({
         verticalAlign: 'middle',
     },
     dialogBackdropRoot: {},
+    dialogCloseButton: {
+        color: theme.palette.text.primary,
+    },
 }))
 
 export type InjectedDialogClassKey =
@@ -39,17 +42,15 @@ export type InjectedDialogClassKey =
     | 'dialogCloseButton'
     | 'dialogBackdropRoot'
 
-export interface InjectedDialogProps
-    extends withClasses<InjectedDialogClassKey>,
-        Omit<DialogProps, 'onClose' | 'title' | 'classes'> {
+export interface InjectedDialogProps extends Omit<DialogProps, 'onClose' | 'title' | 'classes'> {
+    classes?: Partial<Record<InjectedDialogClassKey, string>>
     onClose?(): void
     title?: React.ReactChild
     disableBackdropClick?: boolean
-    disableArrowBack?: boolean
+    titleBarIconStyle?: 'auto' | 'back' | 'close'
 }
 
 export function InjectedDialog(props: InjectedDialogProps) {
-    const classes = useStyles()
     const overwrite = activatedSocialNetworkUI.customization.componentOverwrite || {}
     props = overwrite.InjectedDialog?.props?.(props) ?? props
     const {
@@ -59,21 +60,22 @@ export function InjectedDialog(props: InjectedDialogProps) {
         dialogTitle,
         dialogTitleTypography,
         dialogBackdropRoot,
+        container,
         ...dialogClasses
-    } = useStylesExtends(classes, props, overwrite.InjectedDialog?.classes)
+    } = useStylesExtends(useStyles(), props, overwrite.InjectedDialog?.classes)
     const fullScreen = useMediaQuery(useTheme().breakpoints.down('xs'))
 
-    const { children, open, disableBackdropClick, disableArrowBack, onClose, title, ...rest } = props
+    const { children, open, disableBackdropClick, titleBarIconStyle, onClose, title, ...rest } = props
     const { t } = useI18N()
     const actions = CopyElementWithNewProps(children, DialogActions, { root: dialogActions })
     const content = CopyElementWithNewProps(children, DialogContent, { root: dialogContent })
+    const { extraProps, shouldReplaceExitWithBack } = useDialogStackConsumer(open)
 
     return usePortalShadowRoot((container) => (
         <Dialog
             container={container}
             fullScreen={fullScreen}
             classes={dialogClasses}
-            open={open}
             scroll="paper"
             fullWidth
             maxWidth="sm"
@@ -89,21 +91,26 @@ export function InjectedDialog(props: InjectedDialogProps) {
                     root: dialogBackdropRoot,
                 },
             }}
-            {...rest}>
+            {...rest}
+            {...extraProps}>
             <ErrorBoundary>
                 {title ? (
                     <DialogTitle classes={{ root: dialogTitle }}>
                         <IconButton
+                            size="large"
                             classes={{ root: dialogCloseButton }}
                             aria-label={t('post_dialog__dismiss_aria')}
                             onClick={onClose}>
-                            <DialogDismissIconUI disableArrowBack={disableArrowBack} />
+                            <DialogDismissIconUI style={shouldReplaceExitWithBack ? 'back' : titleBarIconStyle} />
                         </IconButton>
                         <Typography className={dialogTitleTypography} display="inline" variant="inherit">
                             {title}
                         </Typography>
                     </DialogTitle>
                 ) : null}
+                {/* There is a .MuiDialogTitle+.MuiDialogContent selector that provides paddingTop: 0 */}
+                {/* Add an empty span here to revert this effect. */}
+                <span />
                 {content}
                 {actions}
             </ErrorBoundary>

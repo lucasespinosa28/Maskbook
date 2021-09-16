@@ -1,5 +1,6 @@
 import { first, groupBy } from 'lodash-es'
-import { Coin, Currency, DataProvider, Stat, TagType, Trending } from '../../types'
+import type { Coin, Currency, Stat, TagType, Trending } from '../../types'
+import { DataProvider } from '@masknet/public-api'
 import * as coinGeckoAPI from '../coingecko'
 import * as coinMarketCapAPI from '../coinmarketcap'
 import * as uniswapAPI from '../uniswap'
@@ -22,55 +23,21 @@ import { Days } from '../../SNSAdaptor/trending/PriceChartDaysControl'
  * Get supported currencies of specific data provider
  * @param dataProvider
  */
-export async function getCurrenies(dataProvider: DataProvider): Promise<Currency[]> {
+export async function getCurrencies(dataProvider: DataProvider): Promise<Currency[]> {
     switch (dataProvider) {
         case DataProvider.COIN_GECKO:
-            const currencies = await coinGeckoAPI.getAllCurrenies()
+            const currencies = await coinGeckoAPI.getAllCurrencies()
             return currencies.map((x) => ({
                 id: x,
                 name: x.toUpperCase(),
             }))
         case DataProvider.COIN_MARKET_CAP:
-            return Object.values(coinMarketCapAPI.getAllCurrenies()).map((x) => ({
+            return Object.values(coinMarketCapAPI.getAllCurrencies()).map((x) => ({
                 id: String(x.id),
                 name: x.symbol.toUpperCase(),
                 symbol: x.token,
                 description: x.name,
             }))
-        case DataProvider.UNISWAP_INFO:
-            return [
-                {
-                    id: 'usd',
-                    name: 'USD',
-                    symbol: '$',
-                    description: 'Unite State Dollar',
-                },
-            ]
-        default:
-            unreachable(dataProvider)
-    }
-}
-
-export async function getLimitedCurrenies(dataProvider: DataProvider): Promise<Currency[]> {
-    switch (dataProvider) {
-        case DataProvider.COIN_GECKO:
-            return [
-                {
-                    id: 'usd',
-                    name: 'USD',
-                    symbol: '$',
-                    description: 'Unite State Dollar',
-                },
-            ]
-        case DataProvider.COIN_MARKET_CAP:
-            return [
-                {
-                    id: '2781',
-                    name: 'USD',
-                    symbol: '$',
-                    description: 'Unite State Dollar',
-                },
-            ]
         case DataProvider.UNISWAP_INFO:
             return [
                 {
@@ -151,12 +118,12 @@ async function updateCache(dataProvider: DataProvider, keyword?: string) {
             supportedSymbolIdsMap: new Map(Object.entries(coinsGrouped).map(([symbol, coins]) => [symbol, coins])),
             lastUpdated: new Date(),
         })
-    } catch (e) {
+    } catch {
         console.error('failed to update cache')
     }
 }
 
-function isCacheExipred(dataProvider: DataProvider) {
+function isCacheExpired(dataProvider: DataProvider) {
     const lastUpdated = coinNamespace.get(dataProvider)?.lastUpdated.getTime() ?? 0
     return Date.now() - lastUpdated > CRYPTOCURRENCY_MAP_EXPIRES_AT
 }
@@ -168,7 +135,7 @@ export async function checkAvailabilityOnDataProvider(keyword: string, type: Tag
     // cache never built before update in blocking way
     else if (!coinNamespace.has(dataProvider)) await updateCache(dataProvider)
     // data fetched before update in nonblocking way
-    else if (isCacheExipred(dataProvider)) updateCache(dataProvider)
+    else if (isCacheExpired(dataProvider)) updateCache(dataProvider)
     const symbols = coinNamespace.get(dataProvider)?.supportedSymbolsSet
     return symbols?.has(resolveAlias(keyword, dataProvider).toLowerCase()) ?? false
 }
@@ -255,11 +222,11 @@ async function getCoinTrending(id: string, currency: Currency, dataProvider: Dat
                             ) ?? ''
                         ],
                 },
-                market: Object.entries(info.market_data).reduce((accumulated, [key, value]) => {
+                market: Object.entries(info.market_data).reduce<any>((accumulated, [key, value]) => {
                     if (value && typeof value === 'object') accumulated[key] = value[currency.id] ?? 0
                     else accumulated[key] = value
                     return accumulated
-                }, {} as any),
+                }, {}),
                 tickers: info.tickers.slice(0, 30).map((x) => ({
                     logo_url: x.market.logo,
                     trade_url: x.trade_url,
@@ -396,7 +363,7 @@ export async function getCoinTrendingByKeyword(
     const coins = await getAvailableCoins(keyword, tagType, dataProvider)
     if (!coins.length) return null
 
-    // prefer coins on the etherenum network
+    // prefer coins on the ethereum network
     const coin = coins.find((x) => x.contract_address) ?? first(coins)
     if (!coin) return null
 

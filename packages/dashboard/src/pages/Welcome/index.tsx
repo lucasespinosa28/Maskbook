@@ -2,8 +2,10 @@ import { Button } from '@material-ui/core'
 import { useNavigate } from 'react-router'
 import { RoutePaths } from '../../type'
 import { ColumnLayout } from '../../components/RegisterFrame/ColumnLayout'
-import { experimentalStyled as styled } from '@material-ui/core/styles'
-import { MutableRefObject, useCallback, useEffect, useMemo, useRef } from 'react'
+import { styled } from '@material-ui/core/styles'
+import { memo, MutableRefObject, useEffect, useMemo, useRef } from 'react'
+import { useAppearance } from '../Personas/api'
+import { useDashboardI18N } from '../../locales'
 
 const Content = styled('div')(
     ({ theme }) => `
@@ -30,38 +32,57 @@ const IFrame = styled('iframe')(
 
 export default function Welcome() {
     const iframeRef = useRef<HTMLIFrameElement | null>(null)
+    const mode = useAppearance()
     const navigate = useNavigate()
-    const privacyPolicyURL = new URL('./en.html', import.meta.url).toString()
+
+    const agreementContentPageURL = new URL(`./en.html`, import.meta.url).toString()
+    const privacyPolicyDocument = useMemo(() => () => iframeRef?.current?.contentWindow?.document, [iframeRef])
 
     useEffect(
         () => () => {
-            const link = privacyPolicyElement()
-            link && link.removeEventListener('click', handleLinkClick)
+            const link = privacyPolicyDocument()?.getElementById('link')
+            link?.removeEventListener('click', handleLinkClick)
         },
         [],
     )
 
-    const privacyPolicyElement = useMemo(
-        () => () => iframeRef?.current?.contentWindow?.document.getElementById('link'),
-        [iframeRef],
-    )
+    useEffect(() => {
+        updateIFrameStyle()
+    }, [mode])
 
-    const handleIFrameLoad = () => {
-        const link = privacyPolicyElement()
-        link && link.addEventListener('click', handleLinkClick)
+    const updateIFrameStyle = () => {
+        const iframeDocument = privacyPolicyDocument()
+        if (!iframeDocument) return
+
+        const style = iframeDocument.createElement('style')
+        style.innerHTML = `
+              h3, h6 { color: ${mode === 'dark' ? '#FFFFFF' : '#111432'}; }
+              p { color: ${mode === 'dark' ? 'rgba(255, 255, 255, 0.8);' : '#7b8192'}; }
+            `
+        iframeDocument.head?.appendChild(style)
     }
 
-    const handleLinkClick = useCallback(() => {
-        console.log(RoutePaths.PrivacyPolicy)
+    const handleIFrameLoad = () => {
+        updateIFrameStyle()
+
+        const iframeDocument = privacyPolicyDocument()
+        if (!iframeDocument) return
+
+        const link = iframeDocument.getElementById('link')
+        link?.addEventListener('click', handleLinkClick)
+    }
+
+    const handleLinkClick = () => {
         window.open(`next.html#${RoutePaths.PrivacyPolicy}`)
-    }, [])
+    }
 
     return (
         <WelcomeUI
             iframeRef={iframeRef}
-            privacyPolicyURL={privacyPolicyURL}
+            privacyPolicyURL={agreementContentPageURL}
             iframeLoadHandler={handleIFrameLoad}
             agreeHandler={() => navigate(RoutePaths.Setup)}
+            cancelHandler={() => window.close()}
         />
     )
 }
@@ -71,18 +92,26 @@ interface WelcomeUIProps {
     iframeRef: MutableRefObject<HTMLIFrameElement | null>
     iframeLoadHandler(): void
     agreeHandler(): void
+    cancelHandler(): void
 }
 
-const WelcomeUI: React.FC<WelcomeUIProps> = ({ privacyPolicyURL, iframeLoadHandler, agreeHandler, iframeRef }) => (
-    <ColumnLayout>
-        <Content>
-            <IFrame ref={iframeRef} src={privacyPolicyURL} onLoad={iframeLoadHandler} />
-            <ButtonGroup>
-                <Button color="secondary">Cancel</Button>
-                <Button color="primary" onClick={agreeHandler}>
-                    Agree
-                </Button>
-            </ButtonGroup>
-        </Content>
-    </ColumnLayout>
+export const WelcomeUI = memo(
+    ({ privacyPolicyURL, iframeLoadHandler, agreeHandler, cancelHandler, iframeRef }: WelcomeUIProps) => {
+        const t = useDashboardI18N()
+        return (
+            <ColumnLayout>
+                <Content>
+                    <IFrame ref={iframeRef} src={privacyPolicyURL} onLoad={iframeLoadHandler} />
+                    <ButtonGroup>
+                        <Button color="secondary" onClick={cancelHandler}>
+                            {t.cancel()}
+                        </Button>
+                        <Button color="primary" onClick={agreeHandler}>
+                            {t.agree()}
+                        </Button>
+                    </ButtonGroup>
+                </Content>
+            </ColumnLayout>
+        )
+    },
 )

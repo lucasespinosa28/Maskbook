@@ -1,8 +1,19 @@
-import type { GoodGhostingInfo, Player, PlayerStandings, TimelineEvent } from './types'
+import type {
+    GameActionError,
+    GameAssets,
+    GameFinancialData,
+    GoodGhostingInfo,
+    LendingPoolData,
+    Player,
+    PlayerStandings,
+    TimelineEvent,
+} from './types'
 import addSeconds from 'date-fns/addSeconds'
 import differenceInDays from 'date-fns/differenceInDays'
 import formatDuration from 'date-fns/formatDuration'
 import isBefore from 'date-fns/isBefore'
+import { CurrencyType, TransactionStateType } from '@masknet/web3-shared'
+import BigNumber from 'bignumber.js'
 
 export enum PlayerStatus {
     Winning = 'winning',
@@ -14,7 +25,7 @@ export enum PlayerStatus {
 
 export function getPlayerStatus(info: GoodGhostingInfo, player?: Player): PlayerStatus {
     if (!player) return PlayerStatus.Unknown
-    const mostRecentSegmentPaid = Number.parseInt(player.mostRecentSegmentPaid)
+    const mostRecentSegmentPaid = Number.parseInt(player.mostRecentSegmentPaid, 10)
 
     if (mostRecentSegmentPaid === info.lastSegment - 1) return PlayerStatus.Winning
     if (player.withdrawn) return PlayerStatus.Dropout
@@ -68,4 +79,56 @@ export function getReadableInterval(roundLength: number) {
         weeks,
         days,
     })
+}
+
+export function isGameActionError(error: unknown): error is GameActionError {
+    return (
+        Object.values(TransactionStateType).includes((error as GameActionError).gameActionStatus) &&
+        (error as GameActionError).transactionHash !== undefined
+    )
+}
+
+export function getGameFinancialData(
+    info: GoodGhostingInfo,
+    poolData: LendingPoolData,
+    playerStandings: PlayerStandings,
+    assets: GameAssets,
+) {
+    const rawPoolInterest = new BigNumber(poolData.totalAdai).isZero()
+        ? new BigNumber(0)
+        : new BigNumber(poolData.totalAdai).minus(info.totalGamePrincipal)
+    const gameInterest = new BigNumber(info.gameHasEnded ? info.totalGameInterest : rawPoolInterest).multipliedBy(
+        assets.gameAsset?.price ? assets.gameAsset?.price[CurrencyType.USD] : 1,
+    )
+
+    const gameRewards = new BigNumber(poolData.reward)
+        .plus(
+            info.gameHasEnded
+                ? new BigNumber(playerStandings.winning).multipliedBy(info.rewardsPerPlayer)
+                : poolData.incentives,
+        )
+        .multipliedBy(assets.rewardAsset?.price ? assets.rewardAsset?.price[CurrencyType.USD] : 0)
+
+    const totalEarnings = gameInterest.plus(gameRewards)
+    const winnerGains = totalEarnings.div(playerStandings.winning || 1)
+
+    const baseDate = new Date(0)
+    const dateAfterDuration = addSeconds(baseDate, info.segmentLength * (info.lastSegment + 1))
+    const gameDuration = differenceInDays(dateAfterDuration, baseDate)
+
+    const expectedPayment = new BigNumber(info.segmentPayment).multipliedBy(info.lastSegment)
+    const dividend = winnerGains.multipliedBy(365)
+    const divisor = expectedPayment
+        .multipliedBy(gameDuration)
+        .multipliedBy(assets.gameAsset?.price ? assets.gameAsset?.price[CurrencyType.USD] : 1)
+
+    const poolAPY = dividend.dividedBy(divisor).multipliedBy(100)
+
+    return {
+        poolAPY,
+        poolEarnings: info.gameHasEnded ? new BigNumber(info.totalGameInterest) : rawPoolInterest,
+        extraRewards: info.gameHasEnded
+            ? new BigNumber(playerStandings.winning).multipliedBy(info.rewardsPerPlayer)
+            : new BigNumber(poolData.reward).plus(poolData.incentives),
+    } as GameFinancialData
 }

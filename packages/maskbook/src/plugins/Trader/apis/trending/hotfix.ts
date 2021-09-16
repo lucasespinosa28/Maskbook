@@ -1,5 +1,6 @@
 import { NetworkType } from '@masknet/web3-shared'
-import { DataProvider, TagType } from '../../types'
+import { TagType } from '../../types'
+import { DataProvider } from '@masknet/public-api'
 import MIRRORED_TOKENS from './mirrored_tokens.json'
 import STOCKS_KEYWORDS from './stocks.json'
 import CASHTAG_KEYWORDS from './cashtag.json'
@@ -43,7 +44,7 @@ const KEYWORD_ALIAS_MAP: {
     [DataProvider.UNISWAP_INFO]: {},
 }
 
-const KEYWORK_ID_MAP: {
+const KEYWORD_ID_MAP: {
     [key in DataProvider]: {
         [key in NetworkType]?: Record<string, string>
     }
@@ -72,10 +73,16 @@ const ID_ADDRESS_MAP: {
             '6747': '0x32a7c02e79c4ea1008dd6564b35f131428673c41', // CRUST
             '8536': '0x69af81e73A73B40adF4f3d4223Cd9b1ECE623074', // MASK
         },
+        [NetworkType.Polygon]: {
+            '8536': '0x2B9E7ccDF0F4e5B24757c1E1a80e311E34Cb10c7', // MASK
+        },
     },
     [DataProvider.COIN_GECKO]: {
         [NetworkType.Ethereum]: {
             'crust-network': '0x32a7c02e79c4ea1008dd6564b35f131428673c41', // CRUST
+        },
+        [NetworkType.Polygon]: {
+            'mask-network': '0x2B9E7ccDF0F4e5B24757c1E1a80e311E34Cb10c7', // MASK
         },
     },
     [DataProvider.UNISWAP_INFO]: {},
@@ -86,11 +93,14 @@ const ID_NETWORK_MAP: Record<DataProvider, Record<string, NetworkType>> = {
         ethereum: NetworkType.Ethereum,
         'binance-smart-chain': NetworkType.Binance,
         'polygon-pos': NetworkType.Polygon,
+        arbitrum: NetworkType.Arbitrum,
+        xdai: NetworkType.xDai,
     },
     [DataProvider.COIN_MARKET_CAP]: {
         '1027': NetworkType.Ethereum,
         '1839': NetworkType.Binance,
         '3890': NetworkType.Polygon,
+        '5601': NetworkType.xDai,
     },
     [DataProvider.UNISWAP_INFO]: {},
 }
@@ -101,7 +111,7 @@ export function resolveAlias(keyword: string, dataProvider: DataProvider) {
 }
 
 export function resolveCoinId(keyword: string, dataProvider: DataProvider) {
-    return KEYWORK_ID_MAP[dataProvider][currentNetworkSettings.value]?.[keyword.toUpperCase()]
+    return KEYWORD_ID_MAP[dataProvider][currentNetworkSettings.value]?.[keyword.toUpperCase()]
 }
 
 export function resolveCoinAddress(id: string, dataProvider: DataProvider) {

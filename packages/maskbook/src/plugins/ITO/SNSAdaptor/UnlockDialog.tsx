@@ -1,4 +1,5 @@
-import { Link, makeStyles, Typography } from '@material-ui/core'
+import { Link, Typography } from '@material-ui/core'
+import { makeStyles } from '@masknet/theme'
 import BigNumber from 'bignumber.js'
 import { useCallback, useState } from 'react'
 import { v4 as uuid } from 'uuid'
@@ -14,7 +15,7 @@ import {
     pow10,
     resolveAddressLinkOnExplorer,
     useChainId,
-    useTokenBalance,
+    useFungibleTokenBalance,
 } from '@masknet/web3-shared'
 import { EthereumERC20TokenApprovedBoundary } from '../../../web3/UI/EthereumERC20TokenApprovedBoundary'
 import { EthereumWalletConnectedBoundary } from '../../../web3/UI/EthereumWalletConnectedBoundary'
@@ -25,7 +26,7 @@ function isMoreThanMillion(allowance: string, decimals: number) {
     return isGreaterThan(allowance, `100000000000e${decimals}`) // 100 billion
 }
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles()((theme) => ({
     root: {},
     tip: {
         margin: theme.spacing(1.5, 0, 1),
@@ -43,7 +44,7 @@ export interface UnlockDialogProps {
 export function UnlockDialog(props: UnlockDialogProps) {
     const { tokens } = props
     const { t } = useI18N()
-    const classes = useStyles()
+    const { classes } = useStyles()
 
     const { ITO2_CONTRACT_ADDRESS } = useITOConstants()
     const chainId = useChainId()
@@ -75,18 +76,15 @@ export function UnlockDialog(props: UnlockDialogProps) {
         })
     }, [id, token?.address])
     //#endregion
-
     //#region amount
     const [rawAmount, setRawAmount] = useState('')
     const amount = new BigNumber(rawAmount || '0').multipliedBy(pow10(token?.decimals ?? 0))
-    const { value: tokenBalance = '0', loading: loadingTokenBalance } = useTokenBalance(
+    const { value: tokenBalance = '0', loading: loadingTokenBalance } = useFungibleTokenBalance(
         token?.type ?? EthereumTokenType.Native,
         token?.address ?? '',
     )
     //#endregion
-
     if (!tokens.length) return <Typography>No need to unlock any token on this ITO.</Typography>
-
     return (
         <div className={classes.root}>
             <TokenAmountPanel

@@ -5,21 +5,22 @@ import { WebExtensionMessage } from '@dimensiondev/holoflows-kit'
 import Serialization from './type-transform/Serialization'
 import type { ProfileIdentifier, PersonaIdentifier } from '../database/type'
 import type { TypedMessage } from '../protocols/typed-message'
-import type { ThirdPartyPopupContextIdentifier } from '../plugins/External/popup-context'
 import type { SettingsEvents } from '../settings/listener'
 
+// This file is designed as HMR-safe.
+import.meta.webpackHot && import.meta.webpackHot.accept()
 export interface UpdateEvent<Data> {
     readonly reason: 'update' | 'delete' | 'new'
     readonly of: Data
 }
 
-export interface CompositionEvent {
+export interface CompositionRequest {
     readonly reason: 'timeline' | 'popup'
     readonly open: boolean
     readonly content?: TypedMessage
     readonly options?: {
-        onlyMySelf?: boolean
-        shareToEveryOne?: boolean
+        target?: 'E2E' | 'Everyone'
+        startupPlugin?: string
     }
 }
 
@@ -28,6 +29,19 @@ export interface SettingsUpdateEvent {
     key: string
     value: browser.storage.StorageValue
     initial: boolean
+}
+
+export interface ProfileNFTsPageEvent {
+    show: boolean
+}
+
+export interface NFTAvatarEvent {
+    userId: string
+    tokenId: string
+    image?: string
+    amount: string
+    address: string
+    avatarId: string
 }
 
 export interface MaskMessages extends SettingsEvents {
@@ -43,28 +57,32 @@ export interface MaskMessages extends SettingsEvents {
     createInternalSettingsChanged: SettingsUpdateEvent
     /** emit when the settings finished syncing with storage. */
     createInternalSettingsUpdated: SettingsUpdateEvent
-    /** emit when compose status updated. */
-    compositionUpdated: CompositionEvent
+    requestComposition: CompositionRequest
+    replaceComposition: TypedMessage
     personaChanged: (UpdateEvent<PersonaIdentifier> & { owned: boolean })[]
+    personaAvatarChanged: UpdateEvent<string>
     profilesChanged: UpdateEvent<ProfileIdentifier>[]
+    relationsChanged: (UpdateEvent<ProfileIdentifier> & { favor: 0 | 1 })[]
     /** Public Key found / Changed */
     linkedProfilesChanged: {
         of: ProfileIdentifier
         before: PersonaIdentifier | undefined
         after: PersonaIdentifier | undefined
     }[]
-    // When a SNS page get this event, if it know this context, it should response the challenge with pong.
-    thirdPartyPing: { context: ThirdPartyPopupContextIdentifier; challenge: number }
-    thirdPartyPong: number
-    thirdPartySetPayload: {
-        payload: Record<string, unknown>
-        appendText: string
-        context: ThirdPartyPopupContextIdentifier
-    }
-    /** Plugin ID */
-    activatePluginCompositionEntry: string
     pluginEnabled: string
     pluginDisabled: string
+
+    // TODO: move to plugin message
+    profileNFTsPageUpdated: ProfileNFTsPageEvent
+    // TODO: move to plugin message
+    profileNFTsTabUpdated: 'reset'
+    signRequestApproved: {
+        requestID: string
+        selectedPersona: PersonaIdentifier
+    }
+
+    NFTAvatarUpdated: NFTAvatarEvent
+    maskSDKHotModuleReload: void
 }
 export const MaskMessage = new WebExtensionMessage<MaskMessages>({ domain: 'mask' })
 Object.assign(globalThis, { MaskMessage })

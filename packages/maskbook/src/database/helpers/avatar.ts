@@ -1,5 +1,5 @@
 import { ProfileIdentifier } from '../type'
-import { queryAvatarDB, isAvatarOutdatedDB, storeAvatarDB } from '../avatar'
+import { queryAvatarDB, isAvatarOutdatedDB, storeAvatarDB, IdentityWithAvatar } from '../avatar'
 import { memoizePromise } from '../../utils/memoize'
 import { MaskMessage } from '../../utils/messages'
 import { downloadUrl } from '../../utils/utils'
@@ -10,7 +10,7 @@ import { blobToArrayBuffer, blobToDataURL } from '@dimensiondev/kit'
  * ? Because of cross-origin restrictions, we cannot use blob url here. sad :(
  */
 export const queryAvatarDataURL = memoizePromise(
-    async function (identifier: ProfileIdentifier): Promise<string | undefined> {
+    async function (identifier: IdentityWithAvatar): Promise<string | undefined> {
         const buffer = await queryAvatarDB(identifier)
         if (!buffer) throw new Error('Avatar not found')
         return blobToDataURL(new Blob([buffer], { type: 'image/png' }))
@@ -26,7 +26,7 @@ export const queryAvatarDataURL = memoizePromise(
  */
 
 export async function storeAvatar(
-    identifier: ProfileIdentifier,
+    identifier: IdentityWithAvatar,
     avatar: ArrayBuffer | string,
     force?: boolean,
 ): Promise<void> {
@@ -41,8 +41,8 @@ export async function storeAvatar(
         } else {
             await storeAvatarDB(identifier, avatar)
         }
-    } catch (e) {
-        console.error('Store avatar failed', e)
+    } catch (error) {
+        console.error('Store avatar failed', error)
     } finally {
         queryAvatarDataURL.cache.delete(identifier.toText())
         if (identifier instanceof ProfileIdentifier) {

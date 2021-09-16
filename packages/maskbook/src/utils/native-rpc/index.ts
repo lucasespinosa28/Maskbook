@@ -1,8 +1,8 @@
 import { AsyncCall, AsyncCallOptions, _AsyncVersionOf } from 'async-call-rpc/full'
 import { AndroidGeckoViewChannel } from './Android.channel'
 import { iOSWebkitChannel } from './iOS.channel'
-import { WebviewAPI } from './Web'
-import type { AndroidNativeAPIs, iOSNativeAPIs } from './types'
+import { MaskNetworkAPI } from './Web'
+import type { AndroidNativeAPIs, iOSNativeAPIs } from '@masknet/public-api'
 
 // This module won't be used in Web. Let it not effecting HMR.
 if (process.env.architecture === 'web' && import.meta.webpackHot) import.meta.webpackHot.accept()
@@ -14,15 +14,18 @@ export let nativeAPI:
 
 export let sharedNativeAPI: _AsyncVersionOf<iOSNativeAPIs | AndroidNativeAPIs> | undefined = undefined
 if (process.env.architecture === 'app') {
-    const options: Partial<AsyncCallOptions> = { key: 'native' }
+    const options: Partial<AsyncCallOptions> = {
+        key: 'native',
+        parameterStructures: 'by-name',
+    }
     if (process.env.target === 'safari') {
-        const api = (sharedNativeAPI = AsyncCall<iOSNativeAPIs>(WebviewAPI, {
+        const api = (sharedNativeAPI = AsyncCall<iOSNativeAPIs>(MaskNetworkAPI, {
             ...options,
             channel: new iOSWebkitChannel(),
         }))
         nativeAPI = { type: 'iOS', api }
     } else if (process.env.target === 'firefox') {
-        const api = (sharedNativeAPI = AsyncCall<AndroidNativeAPIs>(WebviewAPI, {
+        const api = (sharedNativeAPI = AsyncCall<AndroidNativeAPIs>(MaskNetworkAPI, {
             ...options,
             channel: new AndroidGeckoViewChannel(),
         }))

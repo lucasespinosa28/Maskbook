@@ -10,12 +10,24 @@ import { assertEnvironment, Environment } from '@dimensiondev/holoflows-kit'
 
 export function createDBAccess<DBSchema>(opener: () => Promise<IDBPDatabase<DBSchema>>) {
     let db: IDBPDatabase<DBSchema> | undefined = undefined
+    function clean() {
+        db = undefined
+    }
     return async () => {
+        if (process.env.target === 'safari') await import('safari-14-idb-fix').then(({ default: ready }) => ready())
         assertEnvironment(Environment.ManifestBackground)
-        if (db) return db
+        if (db) {
+            try {
+                // try if the db still open
+                db.transaction([], 'readonly', {})
+                return db
+            } catch {
+                clean()
+            }
+        }
         db = await opener()
-        db.addEventListener('close', () => (db = undefined))
-        db.addEventListener('error', () => (db = undefined))
+        db.addEventListener('close', clean)
+        db.addEventListener('error', clean)
         return db
     }
 }
@@ -38,8 +50,8 @@ export function createDBAccessWithAsyncUpgrade<DBSchema, AsyncUpgradePreparedDat
                 // if the open success, the stored version is small or eq than currentTryOpenVersion
                 // let's call the prepare function to do all the async jobs
                 lastVersionData = await asyncUpgradePrepare(db)
-            } catch (e) {
-                if (currentVersion >= latestVersion) throw e
+            } catch (error) {
+                if (currentVersion >= latestVersion) throw error
                 // if the stored database version is bigger than the currentTryOpenVersion
                 // It will fail and we just move to next version
             }

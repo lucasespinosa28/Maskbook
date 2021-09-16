@@ -1,7 +1,8 @@
 import { memo, useState } from 'react'
 import { ContentContainer } from '../../../../components/ContentContainer'
 import { TabContext, TabPanel } from '@material-ui/lab'
-import { Tab, Tabs, Box, Button, makeStyles } from '@material-ui/core'
+import { Tab, Tabs, Box, Button } from '@material-ui/core'
+import { makeStyles } from '@masknet/theme'
 import { MaskColorVar } from '@masknet/theme'
 import { TokenTable } from '../TokenTable'
 import { useDashboardI18N } from '../../../../locales'
@@ -9,7 +10,7 @@ import { AddTokenDialog } from '../AddTokenDialog'
 import { CollectibleList } from '../CollectibleList'
 import { AddCollectibleDialog } from '../AddCollectibleDialog'
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles()((theme) => ({
     caption: {
         paddingRight: theme.spacing(2.5),
         display: 'flex',
@@ -34,19 +35,18 @@ const useStyles = makeStyles((theme) => ({
 export enum AssetTab {
     Token = 'Token',
     Investment = 'Investment',
-    Collections = 'Collections',
+    Collectibles = 'Collectibles',
 }
 
-const assetTabs = [AssetTab.Token, AssetTab.Collections] as const
+const assetTabs = [AssetTab.Token, AssetTab.Collectibles] as const
 
 export const TokenAssets = memo(() => {
     const t = useDashboardI18N()
-    const classes = useStyles()
-
+    const { classes } = useStyles()
     const assetTabsLabel: Record<AssetTab, string> = {
         [AssetTab.Token]: t.wallets_assets_token(),
         [AssetTab.Investment]: t.wallets_assets_investment(),
-        [AssetTab.Collections]: t.wallets_assets_collections(),
+        [AssetTab.Collectibles]: t.wallets_assets_collectibles(),
     }
 
     const [activeTab, setActiveTab] = useState<AssetTab>(assetTabs[0])
@@ -73,7 +73,7 @@ export const TokenAssets = memo(() => {
                             }>
                             +{' '}
                             {activeTab === AssetTab.Token
-                                ? t.wallets_assets_custom_token()
+                                ? t.wallets_add_token()
                                 : t.wallets_assets_custom_collectible()}
                         </Button>
                     </Box>
@@ -84,9 +84,9 @@ export const TokenAssets = memo(() => {
                         <TokenTable />
                     </TabPanel>
                     <TabPanel
-                        value={AssetTab.Collections}
-                        key={AssetTab.Collections}
-                        className={activeTab === AssetTab.Collections ? classes.tab : undefined}>
+                        value={AssetTab.Collectibles}
+                        key={AssetTab.Collectibles}
+                        className={activeTab === AssetTab.Collectibles ? classes.tab : undefined}>
                         <CollectibleList />
                     </TabPanel>
                 </TabContext>

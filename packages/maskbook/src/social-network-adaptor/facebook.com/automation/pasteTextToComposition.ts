@@ -1,9 +1,10 @@
 import { IntervalWatcher, LiveSelector, MutationObserverWatcher } from '@dimensiondev/holoflows-kit'
-import { dispatchCustomEvents, delay, timeout } from '../../../utils/utils'
+import { delay, timeout } from '../../../utils/utils'
 import { isMobileFacebook } from '../utils/isMobile'
 import type { SocialNetworkUI } from '../../../social-network/types'
 import { untilDocumentReady } from '../../../utils/dom'
 import { MaskMessage } from '../../../utils/messages'
+import { inputText, pasteText } from '@masknet/injected-script'
 
 async function openPostDialogFacebook() {
     await untilDocumentReady()
@@ -23,8 +24,8 @@ async function openPostDialogFacebook() {
                 notActivated.evaluate()[0].click()
                 await timeout(new MutationObserverWatcher(activated), 2000)
                 await delay(1000)
-            } catch (e) {
-                clickFailed(e)
+            } catch (error) {
+                clickFailed(error)
             }
         } else {
             try {
@@ -37,8 +38,8 @@ async function openPostDialogFacebook() {
                 dom2.click()
                 await timeout(new MutationObserverWatcher(activated), 1000)
                 if (!dialog.evaluate()[0]) throw new Error('Click not working')
-            } catch (e) {
-                clickFailed(e)
+            } catch (error) {
+                clickFailed(error)
             }
             console.log('Awaiting dialog')
         }
@@ -47,10 +48,12 @@ async function openPostDialogFacebook() {
     try {
         await timeout(new MutationObserverWatcher(isMobileFacebook ? activated : dialog), 2000)
         console.log('Dialog appeared')
-    } catch {}
-    function clickFailed(e: unknown) {
-        console.warn(e)
-        if (!dialog.evaluate()[0]) alert('请点击输入框')
+    } catch {
+        // ignore
+    }
+    function clickFailed(error: unknown) {
+        console.warn(error)
+        if (!dialog.evaluate()[0]) alert('Click the input box, please.')
     }
 }
 
@@ -82,22 +85,22 @@ export async function pasteTextToCompositionFacebook(
         const [element] = activated.evaluate()
         element.focus()
         await delay(100)
-        if ('value' in document.activeElement!) dispatchCustomEvents(element, 'input', text)
-        else dispatchCustomEvents(element, 'paste', text)
+        if ('value' in document.activeElement!) inputText(text)
+        else pasteText(text)
         await delay(400)
         if (isMobileFacebook) {
             const e = document.querySelector<HTMLDivElement | HTMLTextAreaElement>('.mentions-placeholder')
             if (e) e.style.display = 'none'
         }
         // Prevent Custom Paste failed, this will cause service not available to user.
-        if (element.innerText.indexOf(text) === -1 || ('value' in element && element.value.indexOf(text) === -1))
+        if (!element.innerText.includes(text) || ('value' in element && !element.value.includes(text)))
             copyFailed('Not detected')
-    } catch (e) {
-        copyFailed(e)
+    } catch (error) {
+        copyFailed(error)
     }
     scrollBack()
-    function copyFailed(e: any) {
-        console.warn('Text not pasted to the text area', e)
+    function copyFailed(error: unknown) {
+        console.warn('Text not pasted to the text area', error)
         if (recover) MaskMessage.events.autoPasteFailed.sendToLocal({ text })
     }
 }

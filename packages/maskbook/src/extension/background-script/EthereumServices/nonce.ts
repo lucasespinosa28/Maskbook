@@ -13,7 +13,7 @@ class NonceManager {
     private unlock() {
         this.locked = false
     }
-    private contine() {
+    private continue() {
         if (!this.locked) this.tasks.shift()?.()
     }
     private async getRemoteNonce() {
@@ -23,14 +23,14 @@ class NonceManager {
                 // TODO: is 0 a correct value if nonce is undefined?
                 else resolve(nonce ?? 0)
                 this.unlock()
-                this.contine()
+                this.continue()
             }
             const run = async () => {
                 try {
                     this.lock()
                     callback(null, await getTransactionCount(this.address))
-                } catch (e) {
-                    callback(e)
+                } catch (error: any) {
+                    callback(error)
                 }
             }
             if (this.locked) this.tasks.push(run)
@@ -43,7 +43,7 @@ class NonceManager {
                 if (e) reject(e)
                 else resolve()
                 this.unlock()
-                this.contine()
+                this.continue()
             }
             const run = async () => {
                 this.lock()

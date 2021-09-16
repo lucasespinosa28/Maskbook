@@ -1,4 +1,5 @@
-import { dispatchCustomEvents, delay } from '../../../utils/utils'
+import { delay } from '../../../utils/utils'
+import { inputText, pasteText } from '@masknet/injected-script'
 import { postEditorDraftContentSelector, newPostButtonSelector } from '../utils/selector'
 import type { SocialNetworkUI } from '../../../social-network'
 import { getEditorContent, hasFocus, isCompose, hasEditor } from '../utils/postBox'
@@ -35,9 +36,7 @@ export const pasteTextToCompositionTwitter: SocialNetworkUI.AutomationCapabiliti
                 await delay(interval)
             }
             // paste
-            isMobileTwitter
-                ? dispatchCustomEvents(i.evaluate()!, 'input', text)
-                : dispatchCustomEvents(i.evaluate()!, 'paste', text)
+            isMobileTwitter ? inputText(text) : pasteText(text)
             await delay(interval)
             if (!getEditorContent().replace(/\n/g, '').includes(text.replace(/\n/g, ''))) {
                 fail(new Error('Unable to paste text automatically'))
@@ -53,5 +52,5 @@ export const pasteTextToCompositionTwitter: SocialNetworkUI.AutomationCapabiliti
         setTimeout(() => {
             abortCtr.abort()
         }, timeout)
-        worker(abortCtr).then(undefined, (e) => fail(e))
+        worker(abortCtr).then(undefined, (error) => fail(error))
     }
