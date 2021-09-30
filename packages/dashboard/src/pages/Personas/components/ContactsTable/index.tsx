@@ -13,10 +13,8 @@ import { Messages } from '../../../../API'
 
 const useStyles = makeStyles()((theme) => ({
     container: {
-        height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        maxHeight: 'calc(100% - 58px)',
     },
     header: {
         color: MaskColorVar.normalText,
